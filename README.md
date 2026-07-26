@@ -117,4 +117,8 @@ The unsolved problem, if you want the hard one: **making a multi-host or physica
 
 ## Status
 
-Early. The direction matters more than the definition — we are working out the map by walking it.
+Early, and deliberately so.
+
+**This repo is the evolutionary foundation, not the architecture.** It exists to get something working, and the shape of the real testing factory will be derived from what we learn running it — not from what we guessed at the start. Expect the layout, the case format, and probably the gate boundaries to be replaced once there is evidence about what they should be.
+
+So: treat nothing here as settled, and do not build elaborate structure on top of it yet. The direction matters more than the definition — we are working out the map by walking it, and the first version's job is to be wrong in useful ways.
