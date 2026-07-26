@@ -121,11 +121,35 @@ async function main(): Promise<void> {
   const counts = { pass: 0, fail: 0, skip: 0 };
   for (const r of results) counts[r.outcome]++;
 
-  console.log("─".repeat(72));
-  console.log(`TOTAL: ${results.length}   PASS: ${counts.pass}   FAIL: ${counts.fail}   SKIP: ${counts.skip}`);
-
   const byStatus = new Map<string, number>();
   for (const c of cases) byStatus.set(c.status, (byStatus.get(c.status) ?? 0) + 1);
+
+  console.log("─".repeat(72));
+
+  // TWO INDEPENDENT SIGNALS, deliberately never merged into one number.
+  //
+  // `PASS` means only "this case behaved as documented" — and for an `open`
+  // finding, behaving as documented means the vulnerability STILL REPRODUCES.
+  // So a run where every case passes can encode a pile of live, unfixed
+  // findings. A single green rollup over that is exactly the aggregate-green
+  // failure this repo was founded to name (README, "the five failure
+  // shapes"), so the open count is surfaced as loudly as the pass count
+  // instead of folded into a breakdown line nobody reads.
+  console.log(
+    `CORPUS INTEGRITY  ${counts.pass}/${results.length} behaved as documented` +
+      `   (fail=${counts.fail} skip=${counts.skip})`,
+  );
+
+  const open = cases.filter((c) => c.status === "open");
+  if (open.length > 0) {
+    console.log(
+      `SECURITY POSTURE  ⚠️  ${open.length} finding(s) STILL OPEN — ` + open.map((c) => c.id).join(", "),
+    );
+    console.log("                  those cases PASS *because* the vulnerability still reproduces.");
+  } else {
+    console.log("SECURITY POSTURE  no findings documented as open");
+  }
+
   console.log(
     "By documented status: " +
       [...byStatus.entries()].map(([status, n]) => `${status}=${n}`).join("  "),
@@ -133,6 +157,10 @@ async function main(): Promise<void> {
 
   if (counts.fail > 0) {
     console.log("\nOne or more cases diverged from what they document — see FAIL detail above.");
+    console.log(
+      "NOTE: a FAIL on an `open` case may be GOOD NEWS — it can mean the finding got fixed. " +
+        "Verify, then flip that case's status to `fixed`.",
+    );
     process.exit(1);
   }
 }
