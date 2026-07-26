@@ -1,0 +1,33 @@
+{
+  "id": "r1-f6",
+  "round": 1,
+  "source_id": "F6",
+  "title": "readOnlyDirs are not deterministically read-only at the cortex layer",
+  "severity": "Low",
+  "provenance": {
+    "found_by": "NorthWoods Sentinel Labs (Rob Chuvala)",
+    "date": "2026-07-23",
+    "source": "cortex docs/security/reviews/2026-07-23-nws-security-review.md §4 F6"
+  },
+  "finding": "readOnlyDirs are appended to --add-dir (which grants access) while write-prevention is delivered only by the preamble - unless Write/Edit are denied via tool policy for that session. So a read-only directory is not deterministically write-protected at the cortex layer. Recommendation: fold into the F1 deterministic path-guard: enforce read-only as a code check on Write/Edit/Bash-write targets, not prose.",
+  "repros": [
+    {
+      "verbatim": "Repro status: not attempted.",
+      "source": "cortex docs/security/reviews/2026-07-23-nws-security-review.md §4 F6",
+      "substrate": "requires-live-session"
+    }
+  ],
+  "expected": "A path inside a configured readOnlyDirs entry must deny Write/Edit/NotebookEdit (and Bash write-shaped commands) as a code-level check, while still permitting reads of the same path — read-only must mean read-only, deterministically, not as an instruction the model is asked to obey.",
+  "status": "fixed",
+  "fix": {
+    "pr": 2388,
+    "commit": "3f835614",
+    "summary": "EBH-1b: wired readOnlyDirs distinctly through the dispatch seam (config -> dispatch envelope -> listener -> cc-session) so decidePath's write-deny branch actually receives a non-empty readOnlyDirs set instead of it being flattened into allowedDirs before reaching the hook. F6 'goes live' on this PR per the hardening ledger; the write-deny mechanism itself (decidePath in path-guard.hook.ts) landed with EBH-1 (PR #2355)."
+  },
+  "verification": {
+    "method": "spawn-hook",
+    "substrate": "requires-cortex-checkout",
+    "check": "checks/r1-f6.check.ts",
+    "note": "Spawns path-guard.hook.ts with a readOnlyDirs-scoped fixture directory and asserts: a Write into that directory is denied, while a Read of the same path is allowed."
+  }
+}

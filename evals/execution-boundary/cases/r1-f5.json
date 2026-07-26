@@ -1,0 +1,24 @@
+{
+  "id": "r1-f5",
+  "round": 1,
+  "source_id": "F5",
+  "title": "Good marks recorded as explicitly as the gaps (loader.ts trust gates, fail-closed defaults)",
+  "severity": "Good (not a defect — a positive finding)",
+  "provenance": {
+    "found_by": "NorthWoods Sentinel Labs (Rob Chuvala)",
+    "date": "2026-07-23",
+    "source": "cortex docs/security/reviews/2026-07-23-nws-security-review.md §4 F5"
+  },
+  "finding": "Plugin loader trust gates (loader.ts) - reference quality: org-trust regex applied unconditionally; first-party exemption keyed on cortex's own PR-reviewed manifest, with the two spoofable signals (kind/id, arc tier) explicitly rejected and why documented; path-traversal + symlink-escape containment on install dir and manifest file; entry-path containment; and a TOCTOU-closing frozen sanitized copy of the untrusted export. Bash guard is a well-built command-shape allowlist. Fail-closed is the consistent default. Honest in-code threat notes.",
+  "repros": [],
+  "expected": "This is not a vulnerability to reproduce — it is a commendation the review recorded as explicitly as the gaps, per assay's own practice of asserting per component rather than only chasing defects. The falsifiable claim this case makes: the specific properties the review credited (unconditional org-trust check, explicit rejection of the two spoofable first-party signals, and the TOCTOU-closing frozen export) are still present in loader.ts. If a future change silently removes one of these while the ADR/docs still claim it, that is itself a regression worth catching.",
+  "status": "fixed",
+  "fix": null,
+  "verification": {
+    "method": "doc-grep",
+    "substrate": "requires-cortex-checkout",
+    "check": "checks/r1-f5.check.ts",
+    "note": "Greps src/adapters/loader.ts for durable markers of the three cited properties (unconditional org-trust check, explicit non-spoofable first-party gate, and a frozen/sanitized copy of the untrusted plugin export). This is a positive-invariant regression guard, not a vulnerability check — 'status: fixed' here is used in the sense of 'the good property still holds', not 'a defect was patched'."
+  },
+  "notes": "Used the 'status' field non-standardly here (there is no defect to fix). Flagging this explicitly rather than forcing F5 into a status vocabulary built for defects — see this case's own 'expected' field for the honest framing."
+}

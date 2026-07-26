@@ -1,0 +1,36 @@
+{
+  "id": "r2-f4",
+  "round": 2,
+  "source_id": "F4",
+  "title": "MCP grant-grammar separator collision",
+  "severity": "Medium (HIGH if attacker-influenced MCP server naming is in scope)",
+  "provenance": {
+    "found_by": "NorthWoods Sentinel Labs (NWS swarm, run by Margin, for Rob Chuvala)",
+    "date": "2026-07-27",
+    "source": "GitHub the-metafactory/cortex, issue comment 5084213029 (NWS execution-boundary review, round 2, against cortex v6.13.0)"
+  },
+  "finding": "grants use a server/server.tool grammar, and server names are parsed as the first __-delimited segment - but nothing forbids '.' or '__' inside a server name. A server named github.read_file matches a per-tool grant github.read_file via grants.includes(server); a server named github__evil (tool mcp__github__evil__x) parses to server github and rides a server-wide github grant.",
+  "repros": [
+    {
+      "verbatim": "grant [\"github.read_file\"]; register a server named github.read_file exposing any tool -> the whole server is authorized.",
+      "source": "GitHub the-metafactory/cortex, issue comment 5084213029, finding F4",
+      "substrate": "requires-cortex-checkout",
+      "outcome": "Reproduced by this corpus's unit-import check: decideMcp(\"mcp__github.read_file__x\", [\"github.read_file\"]) returns allow:true. parseMcpToolName splits only on '__', so a server literally named \"github.read_file\" is parsed whole as the server segment, and it string-equals the per-tool grant \"github.read_file\" meant for a DIFFERENT server's single tool."
+    },
+    {
+      "verbatim": "a server named github__evil (tool mcp__github__evil__x) parses to server github and rides a server-wide github grant.",
+      "source": "GitHub the-metafactory/cortex, issue comment 5084213029, finding F4",
+      "substrate": "requires-cortex-checkout",
+      "outcome": "Reproduced by this corpus's unit-import check: decideMcp(\"mcp__github__evil__x\", [\"github\"]) returns allow:true, parsing server=\"github\", tool=\"evil__x\" and matching the server-wide grant."
+    }
+  ],
+  "expected": "The server/tool boundary in the grant grammar must be unambiguous regardless of what a connected MCP server happens to be named — either by forbidding '.' and '__' in configured/recognized MCP server names, or by canonicalizing the grant grammar (e.g. an explicit delimiter reserved and validated at both grant-authoring and server-registration time) so a crafted server name cannot collide with a differently-scoped grant.",
+  "status": "open",
+  "fix": null,
+  "verification": {
+    "method": "unit-import",
+    "substrate": "requires-cortex-checkout",
+    "check": "checks/r2-f4.check.ts",
+    "note": "Unit-imports decideMcp and parseMcpToolName from mcp-guard.hook.ts and calls decideMcp directly with both of the finding's own repro shapes. Asserts BOTH currently return allow:true — i.e. this check expects the vulnerability to reproduce, matching status:open. A future fix should flip these to allow:false, which is the signal to update this case's status."
+  }
+}

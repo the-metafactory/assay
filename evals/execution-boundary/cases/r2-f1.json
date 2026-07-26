@@ -1,0 +1,33 @@
+{
+  "id": "r2-f1",
+  "round": 2,
+  "source_id": "F1",
+  "title": "read-only is silently overridden by an overlapping allowed dir",
+  "severity": "High",
+  "provenance": {
+    "found_by": "NorthWoods Sentinel Labs (NWS swarm, run by Margin, for Rob Chuvala)",
+    "date": "2026-07-27",
+    "source": "GitHub the-metafactory/cortex, issue comment 5084213029 (NWS execution-boundary review, round 2, against cortex v6.13.0)"
+  },
+  "finding": "const inReadOnly = !inAllowed && policy.readOnlyDirs.some(...), and the write-deny only fires on WRITE_TOOLS.has(toolName) && inReadOnly. inReadOnly can only be true when !inAllowed. When a path is inside both a broad allowedDirs entry and a nested readOnlyDirs entry, inAllowed wins, inReadOnly is false, and the write-deny never fires. The common policy \"workspace writable, except this protected subdir\" does not hold. Repro: allowedDirs:[\"/repo\"], readOnlyDirs:[\"/repo/.claude\"] -> Write /repo/.claude/settings.json is allowed.",
+  "repros": [
+    {
+      "verbatim": "allowedDirs:[\"/repo\"], readOnlyDirs:[\"/repo/.claude\"] -> Write /repo/.claude/settings.json is allowed.",
+      "source": "GitHub the-metafactory/cortex, issue comment 5084213029, finding F1",
+      "substrate": "requires-cortex-checkout"
+    }
+  ],
+  "expected": "When a candidate path is contained in both an allowedDirs entry and a readOnlyDirs entry (exact match or nesting either direction), decidePath must resolve the overlap as read-only for every write tool (deny-precedence) — a narrower writable carve-out nested inside a broader read-only root must not regain write access.",
+  "status": "fixed",
+  "fix": {
+    "pr": 2478,
+    "commit": "4a081033",
+    "summary": "decidePath now computes inAllowed and inReadOnly INDEPENDENTLY (no longer `!inAllowed && ...`), and read-only wins on any containment overlap (deny-precedence, not most-specific-match) — closes both the exact-match and the nested case."
+  },
+  "verification": {
+    "method": "unit-import",
+    "substrate": "requires-cortex-checkout",
+    "check": "checks/r2-f1.check.ts",
+    "note": "Unit-imports decidePath from path-guard.hook.ts and calls it directly with the finding's own repro shape (an allowedDirs root containing a nested readOnlyDirs entry), against a real temp-dir fixture standing in for /repo and /repo/.claude. Asserts Write is now denied."
+  }
+}

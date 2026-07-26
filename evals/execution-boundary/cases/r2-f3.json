@@ -1,0 +1,31 @@
+{
+  "id": "r2-f3",
+  "round": 2,
+  "source_id": "F3",
+  "title": "env-prefix stripping is unmodeled and can carry capability-bearing env vars",
+  "severity": "Medium (HIGH if the env-var execution vector is confirmed) — NWS itself rated this conditionally and flagged the concrete exec-escape as needing a PoC",
+  "provenance": {
+    "found_by": "NorthWoods Sentinel Labs (NWS swarm, run by Margin, for Rob Chuvala)",
+    "date": "2026-07-27",
+    "source": "GitHub the-metafactory/cortex, issue comment 5084213029 (NWS execution-boundary review, round 2, against cortex v6.13.0)"
+  },
+  "finding": "stripEnvPrefix strips leading VAR=value assignments before allowlist matching (the module comment itself notes the prefix 'is not modelled in the regex'). The guard strips the env prefix to classify the command, but the stripped env vars still reach execution. Vars such as GIT_PAGER, AWS_PAGER, GIT_EXTERNAL_DIFF, PAGER can point a benign-looking allowed command at a shell or arbitrary binary. GIT_PAGER=/bin/sh git log classifies as an allowed read-only git. Env vars are treated as syntactic noise instead of capability-bearing inputs.",
+  "repros": [
+    {
+      "verbatim": "Repro (illustrative, not executed end-to-end): under an allow rule for git, GIT_PAGER=/bin/sh git log. What is confirmed is the modeling gap (env prefixes are stripped and unmodeled); the concrete exec-escape needs a PoC to pin severity, hence the conditional rating.",
+      "source": "GitHub the-metafactory/cortex, issue comment 5084213029, finding F3",
+      "substrate": "requires-cortex-checkout",
+      "outcome": "Confirmed by this corpus's own spawn-hook check: bash-guard.hook.ts classifies `GIT_PAGER=/bin/sh git log` as an allowed, path-clean `git log` and grants it (permissionDecision: allow) — the env-prefix assignment is stripped before classification and never re-examined. Whether Claude Code's own execution of the resulting command actually launches /bin/sh via GIT_PAGER is NOT independently confirmed here (that would require a real `claude`/git invocation, i.e. a live session) — this corpus can only confirm cortex's own guard grants the command unexamined, which is exactly what NWS marked as the modeling gap distinct from the unconfirmed exec-escape."
+    }
+  ],
+  "expected": "The guard must either model capability-bearing env vars per command (pager, editor, external-diff, hook vars) and deny/strip them, or refuse to strip env prefixes at all and instead deny any command carrying an env assignment that could plausibly influence execution.",
+  "status": "open",
+  "fix": null,
+  "verification": {
+    "method": "spawn-hook",
+    "substrate": "requires-cortex-checkout",
+    "check": "checks/r2-f3.check.ts",
+    "note": "Spawns bash-guard.hook.ts with the finding's own repro command verbatim (GIT_PAGER=/bin/sh git log) under the DEFAULT_CONFIG floor (git log is allowed) and asserts the guard currently GRANTS it — i.e. this check expects the vulnerability to reproduce. If a future fix closes the modeling gap, this check should start reporting a mismatch (grant -> deny), which is the signal to flip this case's status to 'fixed'."
+  },
+  "notes": "The finding's own severity is explicitly conditional: NWS marked the concrete env-var exec-escape (does GIT_PAGER really get invoked as a shell by the downstream tool) as unverified/not executed end-to-end. This corpus does not resolve that half either — it only confirms the classification/modeling gap (the guard grants a command whose env prefix it never inspected), which is the part that is mechanically reproducible without a live claude session. The exec-escape itself remains unverified; see r2-f3's own repro outcome note."
+}

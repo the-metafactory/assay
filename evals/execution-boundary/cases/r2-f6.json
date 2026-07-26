@@ -1,0 +1,30 @@
+{
+  "id": "r2-f6",
+  "round": 2,
+  "source_id": "F6",
+  "title": "empty-path Glob/Grep trusts the working directory without checking it",
+  "severity": "Medium",
+  "provenance": {
+    "found_by": "NorthWoods Sentinel Labs (NWS swarm, run by Margin, for Rob Chuvala)",
+    "date": "2026-07-27",
+    "source": "GitHub the-metafactory/cortex, issue comment 5084213029 (NWS execution-boundary review, round 2, against cortex v6.13.0)"
+  },
+  "finding": "Grep with no path or Glob with a bare wildcard produces zero path tokens, and the guard auto-grants, trusting that dispatch set cwd inside allowedDirs. The guard never verifies cwd itself. If cwd can resolve outside allowedDirs (misconfig, race, symlinked cwd), an empty-path Grep searches out of scope.",
+  "repros": [
+    {
+      "verbatim": "(mechanism, no single-command repro given) — a Grep call with no `path` field, invoked with the hook's process.cwd() outside every allowedDirs/readOnlyDirs entry, is auto-granted without cortex ever resolving or checking cwd against the policy.",
+      "source": "GitHub the-metafactory/cortex, issue comment 5084213029, finding F6",
+      "substrate": "requires-cortex-checkout",
+      "outcome": "Reproduced by this corpus's spawn-hook check: path-guard.hook.ts is spawned with CORTEX_PATH_GUARD scoping allowedDirs to one fixture directory, cwd set (as a spawn option) to a DIFFERENT fixture directory outside that scope, and a Grep call with no `path` field — the hook still emits permissionDecision:allow."
+    }
+  ],
+  "expected": "In the empty-token branch (Glob/Grep with no explicit path), the hook should resolve process.cwd() and containment-check it against allowedDirs/readOnlyDirs before granting, instead of unconditionally trusting that dispatch already scoped it correctly.",
+  "status": "open",
+  "fix": null,
+  "verification": {
+    "method": "spawn-hook",
+    "substrate": "requires-cortex-checkout",
+    "check": "checks/r2-f6.check.ts",
+    "note": "Spawns path-guard.hook.ts with a scoped CORTEX_PATH_GUARD, an out-of-scope cwd, and a path-less Grep call. Asserts the hook currently grants (auto-approves) despite the out-of-scope cwd — i.e. this check expects the vulnerability to reproduce, matching status:open."
+  }
+}
