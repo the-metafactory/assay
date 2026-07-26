@@ -1,0 +1,34 @@
+{
+  "id": "r1-f4",
+  "round": 1,
+  "source_id": "F4",
+  "title": "Principal-DM mode disables the Bash guard entirely (guard-off has zero path containment)",
+  "severity": "Medium (exploitability unproven at time of finding)",
+  "provenance": {
+    "found_by": "NorthWoods Sentinel Labs (Rob Chuvala)",
+    "date": "2026-07-23",
+    "source": "cortex docs/security/reviews/2026-07-23-nws-security-review.md §4 F4"
+  },
+  "finding": "Principal-DM sessions disable the Bash guard entirely ({\"disabled\":true} -> bash-guard.hook.ts). The residual risk is two-part: (1) untrusted forwarded/channel content must not be injectable into the trusted, guard-off DM context; (2) the principal<->platform-ID mapping must be config-integrity protected. Recommendation: treat the mapping as security-critical; ensure no relay path forwards untrusted content into a guard-off DM; land G-301.",
+  "repros": [
+    {
+      "verbatim": "Exploit preconditions: a path that relays untrusted content into a principal-DM session, or a way to corrupt the principal mapping. Repro status: not attempted; exploitability unproven.",
+      "source": "cortex docs/security/reviews/2026-07-23-nws-security-review.md §4 F4",
+      "substrate": "requires-live-session"
+    }
+  ],
+  "expected": "Even in a guard-off (G-300) principal-DM session, where the command-SHAPE allowlist is intentionally skipped, path-containment (allowedDirs/readOnlyDirs) must still apply to Bash commands, closing the gap where file tools were containment-checked in the same session but Bash was not. Ordinary guard-off usage (arbitrary uncatalogued commands, everyday pipes) must keep working — G-300's whole point — while an out-of-scope path read must still be denied.",
+  "status": "fixed",
+  "fix": {
+    "pr": 2385,
+    "commit": "1615760c",
+    "summary": "EBH-1g (cortex#2377): guard-off Bash sessions now run the shared path-containment machinery (in a lenient mode that doesn't require a cataloged command). Follow-up (commit 66609cb1) fixed an over-restriction where the initial fix denied everyday pipes (`cat f.txt | wc -l`); pipes are now decomposed into per-segment containment checks like `&&`/`;` already were, while `$()`/backticks/redirects/background stay denied (they defeat static path analysis)."
+  },
+  "verification": {
+    "method": "spawn-hook",
+    "substrate": "requires-cortex-checkout",
+    "check": "checks/r1-f4.check.ts",
+    "note": "Spawns bash-guard.hook.ts with CORTEX_BASH_GUARD={\"disabled\":true} and asserts: (a) an out-of-scope `cat` read is denied, and (b) an uncataloged, in-scope command (not on the DEFAULT_CONFIG allowlist) still passes through un-denied, proving G-300 itself wasn't regressed by the containment fix."
+  },
+  "notes": "The mapping-integrity and no-relay-path aspects of F4 (the config-critical principal<->platform-ID mapping) are policy/config-integrity questions, not something a hook-level spawn test can exercise; docs/security/ebh-6-posture-findings.md §F4 investigated them and found the trigger itself cannot be forged. This case covers only the Bash-guard containment gap, which is the part with a concrete repro."
+}

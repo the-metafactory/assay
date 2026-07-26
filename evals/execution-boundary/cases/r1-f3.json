@@ -1,0 +1,34 @@
+{
+  "id": "r1-f3",
+  "round": 1,
+  "source_id": "F3",
+  "title": "Sovereignty enforcement defaults to audit-only, and was unreachable from config",
+  "severity": "Low if staged intentionally; Medium if believed-enforcing",
+  "provenance": {
+    "found_by": "NorthWoods Sentinel Labs (Rob Chuvala)",
+    "date": "2026-07-23",
+    "source": "cortex docs/security/reviews/2026-07-23-nws-security-review.md §4 F3"
+  },
+  "finding": "The evaluateSovereignty decision core is sound and fail-closed, but on the review-consumer path sovereigntyEnforce defaults to false — because modelClass is self-declared/spoofable until bound to a signing identity — so a sovereignty violation is logged (enforced: false) and not denied unless an operator turns enforcement on. Recommendation: state explicitly, in the deployment's security posture, whether production has sovereigntyEnforce on.",
+  "repros": [
+    {
+      "verbatim": "Exploit preconditions: production runs with sovereigntyEnforce off (the default) and an operator or the client believes the sovereignty guarantee is live. Repro status: not attempted — the default is confirmed in code.",
+      "source": "cortex docs/security/reviews/2026-07-23-nws-security-review.md §4 F3",
+      "substrate": "any"
+    }
+  ],
+  "expected": "policy.sovereignty.enforce must be a real, documented, principal-settable config key (not merely a constructor-only test hook unreachable from any config file), threaded identically to both consumers that evaluate sovereignty, defaulting to false with the posture honestly logged at boot as audit-only, not enforcing.",
+  "status": "fixed",
+  "fix": {
+    "pr": 2382,
+    "commit": "bde3f4ad",
+    "summary": "EBH-6b: added policy.sovereignty.enforce (boolean, default false), resolved once in cortex.ts and threaded to both review-consumer.ts and brain-consumer.ts. The EBH-6 investigation (docs/security/ebh-6-posture-findings.md) additionally found the gap was WORSE than reported: sovereigntyEnforce wasn't just defaulted off, it was constructor-only — no config field could reach it at all before this fix, in either consumer."
+  },
+  "verification": {
+    "method": "doc-grep",
+    "substrate": "requires-cortex-checkout",
+    "check": "checks/r1-f3.check.ts",
+    "note": "Greps src/cortex.ts for the single resolved `sovereigntyEnforce` value and confirms it is passed to BOTH consumer construction sites — the exact asymmetry the EBH-6 investigation found and closed. Does not spin up a live bus/consumer; that would need a running stack."
+  },
+  "notes": "Enforcement is STILL off by default in every shipped template — this fix makes the posture honest and reachable, it does not flip enforcement on. Do not read 'fixed' here as 'sovereignty is now enforced by default' — it is not, and per the hardening plan should not be until model-class-to-signing-identity binding (cortex#2117) lands."
+}

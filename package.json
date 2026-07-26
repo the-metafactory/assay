@@ -1,0 +1,13 @@
+{
+  "name": "assay",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "eval:execution-boundary": "bun run evals/execution-boundary/runner.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5"
+  }
+}

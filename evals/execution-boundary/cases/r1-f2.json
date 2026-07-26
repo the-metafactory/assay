@@ -1,0 +1,30 @@
+{
+  "id": "r1-f2",
+  "round": 1,
+  "source_id": "F2",
+  "title": "Plugins execute with full daemon authority; no post-load sandbox",
+  "severity": "High (accepted, documented residual risk)",
+  "provenance": {
+    "found_by": "NorthWoods Sentinel Labs (Rob Chuvala)",
+    "date": "2026-07-23",
+    "source": "cortex docs/security/reviews/2026-07-23-nws-security-review.md §4 F2"
+  },
+  "finding": "In-process plugins hold full daemon authority; a malicious plugin equals full stack compromise, and `await import()` executes arbitrary plugin code at load. ADR-0024 D4 states this directly, including \"the compat gate is not a security gate.\" This is not a newly discovered vulnerability — it is an accepted High residual risk the client documented in ADR-0024 D4. The review's contribution is to confirm the load-time mitigations are strong and to recommend explicit escalation triggers.",
+  "repros": [
+    {
+      "verbatim": "Exploit preconditions: a bundle that passes the load gates (org-trusted repo + first-party allowlist or system.plugins.external on) then runs arbitrary code. Repro status: not attempted (accepted risk).",
+      "source": "cortex docs/security/reviews/2026-07-23-nws-security-review.md §4 F2",
+      "substrate": "requires-live-session"
+    }
+  ],
+  "expected": "This is a documented, accepted residual — the case's job is not to prove it 'fixed' but to confirm the accepting document (ADR-0024 D4) still says what it says, and that no in-tree change has silently narrowed the disclosure without updating the ADR. If a future change actually closes this (process isolation, per ADR-0024's own named escalation), this case's status should flip to 'fixed' and the check below should start failing to force that update.",
+  "status": "accepted-residual",
+  "fix": null,
+  "verification": {
+    "method": "doc-grep",
+    "substrate": "requires-cortex-checkout",
+    "check": "checks/r1-f2.check.ts",
+    "note": "Greps docs/adr/0024-pluggable-surface-adapters.md for the durable D4 language ('full daemon authority', 'compat gate is not a security gate') and for the named future escalation (process isolation / registry signing) — confirms the residual is still accurately disclosed, not silently dropped from the docs while the underlying risk stays live. Does not attempt to load a real plugin or prove code execution; that would require a live daemon."
+  },
+  "notes": "EBH-5 (registry signing, PR #2422) has since landed and narrows WHICH bundles can load (signature-verified, trust-root-pinned) — but it does not sandbox what a verified-but-malicious first-party bundle can DO once loaded, so F2 itself remains an accepted residual per ADR-0024 D4's own framing. Do not read EBH-5 as closing F2."
+}

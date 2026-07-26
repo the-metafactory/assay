@@ -1,0 +1,33 @@
+{
+  "id": "r2-f2",
+  "round": 2,
+  "source_id": "F2",
+  "title": "a malformed config field fails open to no restriction at all",
+  "severity": "High",
+  "provenance": {
+    "found_by": "NorthWoods Sentinel Labs (NWS swarm, run by Margin, for Rob Chuvala)",
+    "date": "2026-07-27",
+    "source": "GitHub the-metafactory/cortex, issue comment 5084213029 (NWS execution-boundary review, round 2, against cortex v6.13.0)"
+  },
+  "finding": "toStringArray returns [] for any non-array value; an empty policy is treated as 'no restriction configured' and calls pass(). CORTEX_PATH_GUARD='{\"allowedDirs\":\"/repo\",\"readOnlyDirs\":[]}' (a string where an array is expected) coerces allowedDirs to []. Both arrays empty, so the guard passes every path. A single wrong-typed field silently disables all containment - and it is a config-shape mistake, not an attack, so it can happen by accident.",
+  "repros": [
+    {
+      "verbatim": "set the env var as above, then Read /etc/passwd - allowed.",
+      "source": "GitHub the-metafactory/cortex, issue comment 5084213029, finding F2",
+      "substrate": "requires-cortex-checkout"
+    }
+  ],
+  "expected": "A CORTEX_PATH_GUARD field that IS PRESENT but the wrong shape (e.g. a string where an array of strings is required) must be treated as a genuine failure and DENY, distinct from a field that is legitimately ABSENT (which is a deliberate 'no restriction on this axis' and resolves to []). A malformed value must never be silently coerced into an empty, permissive policy.",
+  "status": "fixed",
+  "fix": {
+    "pr": 2478,
+    "commit": "4a081033",
+    "summary": "validateDirsField now distinguishes ABSENT (ok:true, value:[]) from PRESENT-BUT-WRONG-SHAPE (ok:false, deny) on a per-field basis; parsePathGuardConfig propagates ok:false for either allowedDirs or readOnlyDirs failing validation, and the hook's main() denies rather than silently substituting an empty policy."
+  },
+  "verification": {
+    "method": "unit-import",
+    "substrate": "requires-cortex-checkout",
+    "check": "checks/r2-f2.check.ts",
+    "note": "Unit-imports parsePathGuardConfig and validateDirsField from path-guard.hook.ts and calls parsePathGuardConfig with the finding's own repro string verbatim ('{\"allowedDirs\":\"/repo\",\"readOnlyDirs\":[]}'). Asserts ok:false (deny), not a silent empty-policy pass."
+  }
+}

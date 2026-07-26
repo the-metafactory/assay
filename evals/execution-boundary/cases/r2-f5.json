@@ -1,0 +1,31 @@
+{
+  "id": "r2-f5",
+  "round": 2,
+  "source_id": "F5",
+  "title": "no denylist for boundary-weakening config files inside an allowed dir",
+  "severity": "Medium",
+  "provenance": {
+    "found_by": "NorthWoods Sentinel Labs (NWS swarm, run by Margin, for Rob Chuvala)",
+    "date": "2026-07-27",
+    "source": "GitHub the-metafactory/cortex, issue comment 5084213029 (NWS execution-boundary review, round 2, against cortex v6.13.0)"
+  },
+  "finding": "decidePath gates on containment and read-only only; it does not special-case files that weaken the boundary itself (.claude/settings.json, .claude/settings.local.json, .cursor/mcp.json, .bashrc, .gitconfig, .git/config, hooks). With the workspace or home in allowedDirs, a session can write these and persist a next-session weakening. This compounds with F1: the natural mitigation (put .claude in readOnlyDirs) is defeated by F1.",
+  "repros": [
+    {
+      "verbatim": "(mechanism, no single-command repro given) — a Write to a boundary-weakening path (e.g. <allowed-workspace>/.claude/settings.json) inside an allowedDirs root succeeds because decidePath only checks containment/read-only, never the filename's own security significance.",
+      "source": "GitHub the-metafactory/cortex, issue comment 5084213029, finding F5",
+      "substrate": "requires-cortex-checkout",
+      "outcome": "Reproduced by this corpus's unit-import check: decidePath(\"Write\", \"<fixture>/.claude/settings.json\", {allowedDirs:[\"<fixture>\"], readOnlyDirs:[]}) returns allow:true — nothing about the filename is special-cased."
+    }
+  ],
+  "expected": "A deterministic boundary-file denylist should deny writes to a maintained set of self-modifying config/hook paths regardless of containment (i.e. even inside an otherwise-writable allowedDirs root) — because these paths' significance is not 'is it in scope', it's 'does writing it change what future sessions are allowed to do'.",
+  "status": "open",
+  "fix": null,
+  "verification": {
+    "method": "unit-import",
+    "substrate": "requires-cortex-checkout",
+    "check": "checks/r2-f5.check.ts",
+    "note": "Unit-imports decidePath from path-guard.hook.ts and calls it with a Write to a boundary-weakening filename (.claude/settings.json) inside an allowedDirs-only fixture (no readOnlyDirs entry covering it). Asserts allow:true — i.e. this check expects the finding's mechanism to still hold, matching status:open."
+  },
+  "notes": "This finding also notes it compounds with round-2 F1 (fixed) — with F1 fixed, a principal CAN now put .claude in readOnlyDirs and have it actually deny writes (the natural mitigation NWS said F1 defeated). That narrows the practical risk versus when this finding was written, but F5 itself — the absence of a purpose-built denylist independent of how allowedDirs/readOnlyDirs happen to be configured — remains open; this case tests F5 specifically, not the compounding relationship."
+}
