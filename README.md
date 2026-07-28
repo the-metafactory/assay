@@ -112,6 +112,29 @@ So: can this test fail? Does it assert what it claims? Is it measuring the subst
 
 ---
 
+## How the pieces fit
+
+Two contributions arrived independently, from opposite ends of the problem, and they compose exactly.
+
+**Rob Chuvala (NorthWoods Sentinel)** brought the offensive read: this is control-assurance, the meta-gate is the keystone, and — the important limit — *assay locks in known-good, it does not find unknown-bad.* He named the composition himself: **find upstream, lock downstream.**
+
+**Vincent Zontini** brought the locking mechanism, from SAN hardware health testing: pin the substrate, capture known-good output, and treat any variance as a finding. A control file listing *expected* paths makes a **missing** file a variance — which is the silent-detector fix in one line.
+
+Put together:
+
+```
+discovery  ──▶  finding  ──▶  golden case  ──▶  locked forever
+(Rob's engine)                (Vincent's method)
+```
+
+The eval corpus is the seam. Every finding a discovery pass produces becomes a permanent case, so round N automatically re-runs 1..N-1. That is already literally true — the corpus in `evals/execution-boundary/` *is* rounds 1 and 2 of Rob's review, locked.
+
+And they answer each other. Rob's keystone worry is *"can this test fail?"* — assume-breach pointed at your own instruments. Vincent's method is structurally resistant to it: **a total comparison has no assertion logic to be vacuous.** There is nothing to write wrong, because nothing is written.
+
+Where they create genuine tension is the **exact/bounded boundary**. Vincent's infrastructure output is deterministic; Rob's adversarial cases run against agent behaviour, which is not. So the two methods meet precisely at the line between byte-for-byte comparison and schema-level assertion — which makes that boundary the thing to govern most carefully, and *bounded creep* the drift to watch.
+
+Neither piece is sufficient alone. A discovery engine with nothing downstream re-finds the same bugs forever. A locking mechanism with nothing upstream locks in whatever it happened to start with.
+
 ## Layout
 
 ```
