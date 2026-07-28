@@ -11,6 +11,15 @@
   },
   "finding": "Plugin loader trust gates (loader.ts) - reference quality: org-trust regex applied unconditionally; first-party exemption keyed on cortex's own PR-reviewed manifest, with the two spoofable signals (kind/id, arc tier) explicitly rejected and why documented; path-traversal + symlink-escape containment on install dir and manifest file; entry-path containment; and a TOCTOU-closing frozen sanitized copy of the untrusted export. Bash guard is a well-built command-shape allowlist. Fail-closed is the consistent default. Honest in-code threat notes.",
   "repros": [],
+  "captured_on": {
+    "date": "2026-07-27",
+    "os": null,
+    "arch": null,
+    "kernel_release": null,
+    "bun_version": null,
+    "cortex_commit": null,
+    "note": "Backfilled after the fact (assay substrate-attestation fix, prompted by Rob Chuvala/NWS: \"what substrate were those captured on? If we didn't record it, we have cases locked against an unpinned baseline.\"). This corpus's runner captured no substrate stamp before this fix, so the only thing honestly knowable is the date this case entered the corpus — from the corpus's own commit (2173581, 2026-07-27T11:57:28+12:00), NOT from provenance.date above (that's when the underlying finding was discovered, a different event). OS/arch/kernel/bun-version/cortex-commit were never recorded at capture time and are not reconstructable — do not infer them from the machine running this backfill, or from the cortex commit named in this case's `fix` field (that documents the FIX, not the verification substrate)."
+  },
   "expected": "This is not a vulnerability to reproduce — it is a commendation the review recorded as explicitly as the gaps, per assay's own practice of asserting per component rather than only chasing defects. The falsifiable claim this case makes: the specific properties the review credited (unconditional org-trust check, explicit rejection of the two spoofable first-party signals, and the TOCTOU-closing frozen export) are still present in loader.ts. If a future change silently removes one of these while the ADR/docs still claim it, that is itself a regression worth catching.",
   "status": "fixed",
   "fix": null,

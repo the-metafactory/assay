@@ -18,6 +18,15 @@
       "outcome": "Reproduced by this corpus's unit-import check: decidePath(\"Write\", \"<fixture>/.claude/settings.json\", {allowedDirs:[\"<fixture>\"], readOnlyDirs:[]}) returns allow:true — nothing about the filename is special-cased."
     }
   ],
+  "captured_on": {
+    "date": "2026-07-27",
+    "os": null,
+    "arch": null,
+    "kernel_release": null,
+    "bun_version": null,
+    "cortex_commit": null,
+    "note": "Backfilled after the fact (assay substrate-attestation fix, prompted by Rob Chuvala/NWS: \"what substrate were those captured on? If we didn't record it, we have cases locked against an unpinned baseline.\"). This corpus's runner captured no substrate stamp before this fix, so the only thing honestly knowable is the date this case entered the corpus — from the corpus's own commit (2173581, 2026-07-27T11:57:28+12:00), NOT from provenance.date above (that's when the underlying finding was discovered, a different event). OS/arch/kernel/bun-version/cortex-commit were never recorded at capture time and are not reconstructable — do not infer them from the machine running this backfill, or from the cortex commit named in this case's `fix` field (that documents the FIX, not the verification substrate)."
+  },
   "expected": "A deterministic boundary-file denylist should deny writes to a maintained set of self-modifying config/hook paths regardless of containment (i.e. even inside an otherwise-writable allowedDirs root) — because these paths' significance is not 'is it in scope', it's 'does writing it change what future sessions are allowed to do'.",
   "status": "open",
   "fix": null,

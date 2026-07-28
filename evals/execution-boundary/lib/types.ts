@@ -2,6 +2,8 @@
 // field-by-field rationale; this file is the type the runner and every
 // case JSON file are checked against.
 
+import type { CapturedOnStamp } from "./substrate";
+
 export type CaseStatus = "fixed" | "open" | "accepted-residual" | "unverified";
 
 export type VerificationMethod =
@@ -44,6 +46,16 @@ export interface CaseRecord {
   /** One or more repro records — the original review's repro (often
    *  "not attempted"), plus any follow-up repro cortex ran itself. */
   repros: ReproRecord[];
+  /**
+   * The substrate identity present when THIS CASE's expectation was
+   * established — not when it was last run (see lib/substrate.ts). The
+   * existing r1-f1..r1-f6 / r2-f1..r2-f6 cases were backfilled: their real
+   * capture-time substrate was never recorded, so most fields here are
+   * honestly `null` rather than guessed. A case authored from this point
+   * forward should set this from `captureSubstrateStamp()` at the time its
+   * check first locks in.
+   */
+  captured_on: CapturedOnStamp;
   /** What correct looks like, stated so it can be refuted. */
   expected: string;
   status: CaseStatus;

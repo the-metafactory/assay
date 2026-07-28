@@ -50,11 +50,55 @@ Each case carries (see `lib/types.ts` for the authoritative shape):
   what this corpus's own check found when it ran the repro itself.
 - **`provenance`** — who found it, when, which round, and the exact doc/API
   reference the text was pulled from.
+- **`captured_on`** — the substrate identity present when THIS CASE's
+  expectation was established (see "Substrate attestation" below). Not the
+  same thing as `provenance.date` — that's when the underlying finding was
+  *discovered*; `captured_on` is when it was *locked into this corpus*.
 - **`status`** — `fixed` / `open` / `accepted-residual` / `unverified`.
 - **`fix`** — PR number + commit + summary, when `status: fixed`.
 - **`verification`** — `method` (`unit-import` / `spawn-hook` / `doc-grep` /
   `none`), the `substrate` it needs, and a pointer to its `checks/*.check.ts`
   module (or `null`, with a `note` explaining why none exists).
+
+## Substrate attestation
+
+**"A result without its substrate is not a result"** (charter, "Substrates").
+Rob Chuvala (NWS) caught the gap this corpus originally had: rounds 1 and 2
+were locked in with no record of what they were captured on. `runner.ts` now
+captures a `SubstrateStamp` (`lib/substrate.ts`) at the start of every run —
+OS, arch, kernel release, Bun version, and (the field that matters most,
+because every check here asserts against cortex's real code) the cortex
+checkout's HEAD commit SHA and whether it was clean. It's printed at the top
+of every run's output, before anything else.
+
+Each case's `captured_on` field records the same shape as it stood when the
+case's expectation was established — set once, at authoring time, never
+auto-updated by a later run (a stamp that updates itself on every run isn't
+recording a baseline, it's recording "now").
+
+The existing `r1-*`/`r2-*` cases were backfilled honestly rather than
+retroactively: their real capture-time substrate was never recorded, so only
+the corpus's own commit date is known and every other field is `null`, with
+a `note` explaining why (do not read a later cortex commit named in a case's
+`fix` field as its verification substrate — that documents the fix, not what
+the check ran against).
+
+At the end of every run, a **third signal** — `SUBSTRATE DRIFT`, alongside
+`CORPUS INTEGRITY` and `SECURITY POSTURE` below — reports, per case:
+
+- **unpinned baseline** (`captured_on` has no comparable field recorded, as
+  with every backfilled case above) — loudest, because this is exactly the
+  silent gap the finding named;
+- **drift** (a recorded field disagrees with this run's stamp, e.g. a
+  different `cortex_commit`) — informational, not a failure: it means this
+  result isn't directly comparable to the one on file, not that anything is
+  wrong;
+- **match** — the quiet case.
+
+Substrate drift is never folded into `CORPUS INTEGRITY`/`SECURITY POSTURE`
+and never fails the run — same reasoning as the existing two-signal split:
+collapsing "not comparable" into pass/fail is exactly the aggregate-green
+failure shape this repo exists to avoid.
 
 ## Check contract
 

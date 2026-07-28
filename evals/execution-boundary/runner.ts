@@ -19,6 +19,7 @@
 
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { assessDrift, captureSubstrateStamp, formatStamp } from "./lib/substrate";
 import type { CaseRecord, CheckFn, CheckOutcome } from "./lib/types";
 
 const HERE = import.meta.dir;
@@ -107,7 +108,15 @@ async function main(): Promise<void> {
   if (args.round) cases = cases.filter((c) => c.round === args.round);
   if (args.ids) cases = cases.filter((c) => args.ids?.includes(c.id));
 
-  console.log(`execution-boundary corpus — ${cases.length} case(s)\n`);
+  // A result without its substrate is not a result (README, "Substrates").
+  // Captured once per run — every case in this run was checked against the
+  // same cortex checkout — and printed before anything else, so it's the
+  // first thing anyone reading the output sees, not a footnote.
+  const substrate = captureSubstrateStamp();
+
+  console.log(`execution-boundary corpus — ${cases.length} case(s)`);
+  console.log(`substrate: ${formatStamp(substrate)}`);
+  console.log(`captured:  ${substrate.captured_at}\n`);
 
   const results: RunOutcome[] = [];
   for (const c of cases) {
@@ -154,6 +163,38 @@ async function main(): Promise<void> {
     "By documented status: " +
       [...byStatus.entries()].map(([status, n]) => `${status}=${n}`).join("  "),
   );
+
+  // THIRD SIGNAL, same spirit as the two above: never collapsed into
+  // pass/fail, because substrate drift is information, not a verdict. A
+  // case whose captured_on disagrees with this run's stamp isn't wrong —
+  // it's a result that isn't directly comparable to the one on file, which
+  // is exactly the silent gap Rob Chuvala's review named (README: "a result
+  // without its substrate is not a result").
+  const unknownBaseline: string[] = [];
+  const drifted: { id: string; differences: string[] }[] = [];
+  let matched = 0;
+  for (const c of cases) {
+    const assessment = assessDrift(c.captured_on, substrate);
+    if (assessment.kind === "unknown") unknownBaseline.push(c.id);
+    else if (assessment.kind === "drift") drifted.push({ id: c.id, differences: assessment.differences });
+    else matched++;
+  }
+
+  if (unknownBaseline.length > 0) {
+    console.log(
+      `SUBSTRATE DRIFT   ⚠️  ${unknownBaseline.length} case(s) with an UNPINNED baseline (captured_on never recorded a comparable substrate) — ` +
+        unknownBaseline.join(", "),
+    );
+  }
+  if (drifted.length > 0) {
+    console.log(`SUBSTRATE DRIFT   ℹ️  ${drifted.length} case(s) captured on a DIFFERENT substrate than this run:`);
+    for (const d of drifted) console.log(`                  ${d.id}: ${d.differences.join(", ")}`);
+  }
+  if (unknownBaseline.length === 0 && drifted.length === 0) {
+    console.log(`SUBSTRATE DRIFT   none — ${matched}/${cases.length} case(s) match this run's substrate`);
+  } else if (matched > 0) {
+    console.log(`                  (${matched}/${cases.length} case(s) match this run's substrate)`);
+  }
 
   if (counts.fail > 0) {
     console.log("\nOne or more cases diverged from what they document — see FAIL detail above.");
