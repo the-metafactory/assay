@@ -17,6 +17,15 @@
       "substrate": "requires-live-session"
     }
   ],
+  "captured_on": {
+    "date": "2026-07-27",
+    "os": null,
+    "arch": null,
+    "kernel_release": null,
+    "bun_version": null,
+    "cortex_commit": null,
+    "note": "Backfilled after the fact (assay substrate-attestation fix, prompted by Rob Chuvala/NWS: \"what substrate were those captured on? If we didn't record it, we have cases locked against an unpinned baseline.\"). This corpus's runner captured no substrate stamp before this fix, so the only thing honestly knowable is the date this case entered the corpus — from the corpus's own commit (2173581, 2026-07-27T11:57:28+12:00), NOT from provenance.date above (that's when the underlying finding was discovered, a different event). OS/arch/kernel/bun-version/cortex-commit were never recorded at capture time and are not reconstructable — do not infer them from the machine running this backfill, or from the cortex commit named in this case's `fix` field (that documents the FIX, not the verification substrate)."
+  },
   "expected": "Even in a guard-off (G-300) principal-DM session, where the command-SHAPE allowlist is intentionally skipped, path-containment (allowedDirs/readOnlyDirs) must still apply to Bash commands, closing the gap where file tools were containment-checked in the same session but Bash was not. Ordinary guard-off usage (arbitrary uncatalogued commands, everyday pipes) must keep working — G-300's whole point — while an out-of-scope path read must still be denied.",
   "status": "fixed",
   "fix": {

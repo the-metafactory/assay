@@ -24,6 +24,15 @@
       "outcome": "Reproduced by this corpus's unit-import check: decideMcp(\"mcp__github__evil__x\", [\"github\"]) returns allow:true, parsing server=\"github\", tool=\"evil__x\" and matching the server-wide grant."
     }
   ],
+  "captured_on": {
+    "date": "2026-07-27",
+    "os": null,
+    "arch": null,
+    "kernel_release": null,
+    "bun_version": null,
+    "cortex_commit": null,
+    "note": "Backfilled after the fact (assay substrate-attestation fix, prompted by Rob Chuvala/NWS: \"what substrate were those captured on? If we didn't record it, we have cases locked against an unpinned baseline.\"). This corpus's runner captured no substrate stamp before this fix, so the only thing honestly knowable is the date this case entered the corpus — from the corpus's own commit (2173581, 2026-07-27T11:57:28+12:00), NOT from provenance.date above (that's when the underlying finding was discovered, a different event). OS/arch/kernel/bun-version/cortex-commit were never recorded at capture time and are not reconstructable — do not infer them from the machine running this backfill, or from the cortex commit named in this case's `fix` field (that documents the FIX, not the verification substrate)."
+  },
   "expected": "The server/tool boundary in the grant grammar must be unambiguous regardless of what a connected MCP server happens to be named — either by forbidding '.' and '__' in configured/recognized MCP server names, or by canonicalizing the grant grammar (e.g. an explicit delimiter reserved and validated at both grant-authoring and server-registration time) so a crafted server name cannot collide with a differently-scoped grant.",
   "status": "open",
   "fix": null,

@@ -18,6 +18,15 @@
       "outcome": "Confirmed by this corpus's own spawn-hook check: bash-guard.hook.ts classifies `GIT_PAGER=/bin/sh git log` as an allowed, path-clean `git log` and grants it (permissionDecision: allow) — the env-prefix assignment is stripped before classification and never re-examined. Whether Claude Code's own execution of the resulting command actually launches /bin/sh via GIT_PAGER is NOT independently confirmed here (that would require a real `claude`/git invocation, i.e. a live session) — this corpus can only confirm cortex's own guard grants the command unexamined, which is exactly what NWS marked as the modeling gap distinct from the unconfirmed exec-escape."
     }
   ],
+  "captured_on": {
+    "date": "2026-07-27",
+    "os": null,
+    "arch": null,
+    "kernel_release": null,
+    "bun_version": null,
+    "cortex_commit": null,
+    "note": "Backfilled after the fact (assay substrate-attestation fix, prompted by Rob Chuvala/NWS: \"what substrate were those captured on? If we didn't record it, we have cases locked against an unpinned baseline.\"). This corpus's runner captured no substrate stamp before this fix, so the only thing honestly knowable is the date this case entered the corpus — from the corpus's own commit (2173581, 2026-07-27T11:57:28+12:00), NOT from provenance.date above (that's when the underlying finding was discovered, a different event). OS/arch/kernel/bun-version/cortex-commit were never recorded at capture time and are not reconstructable — do not infer them from the machine running this backfill, or from the cortex commit named in this case's `fix` field (that documents the FIX, not the verification substrate)."
+  },
   "expected": "The guard must either model capability-bearing env vars per command (pager, editor, external-diff, hook vars) and deny/strip them, or refuse to strip env prefixes at all and instead deny any command carrying an env assignment that could plausibly influence execution.",
   "status": "open",
   "fix": null,
