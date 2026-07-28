@@ -26,6 +26,22 @@ In a single week, two unrelated systems — an agent security boundary and a rem
 
 Documents are what we write for the parts we cannot yet automate. Everything here is aimed at reducing that set.
 
+## What this is for — and what it is not
+
+All five failure shapes are **detection** failures, which is what an operator hunts for on an engagement. A control that cannot fire is the first thing an attacker looks for, because it buys the defender false confidence for free. So this is not only proving the code does what you meant — it is proving the defences can actually fire. Purple-teaming your own test suite.
+
+And the boundary, named honestly:
+
+> **assay locks in known-good. It does not find unknown-bad.**
+
+It tests whether controls work; it does not test whether they can be *defeated*. The `adversarial` cases here are regression — does yesterday's fix still hold — not discovery of tomorrow's bypass. That is not a gap in the design; it is the edge of what a testing factory is.
+
+Discovery is a different engine. The two compose: **find upstream, lock downstream.** Every finding a discovery pass produces drops into the corpus as a permanent case.
+
+Stating this matters, because a factory that believed it was also a discovery engine would produce the most dangerous shape of all — an aggregate green that thinks it is complete.
+
+*(That framing is Rob Chuvala's, from `ideas/2026-07-27-red-team-lens-control-assurance.md`.)*
+
 ---
 
 ## The shape
