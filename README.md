@@ -1,8 +1,40 @@
 # assay
 
-**The testing factory.** Machine-verifiable gates across specification, build, review, release, and continuous — so that knowing what is true keeps pace with building.
+**A practice for knowing what is true about a system, at the pace software is now built.**
 
 > *assay* — a test to determine what something actually contains, as opposed to what it is labelled as.
+
+---
+
+## The goal
+
+> **Every claim we make about a system is paired with an executable comparison that can fail — and the pairing itself is checked.**
+
+That is the whole thing. Everything below is machinery for it.
+
+It is deliberately *not* "write more tests". A test is one kind of comparison, and most claims in a running system have none at all: a detector claims coverage, an aggregate claims health, a fix claims completeness, a boundary claims enforcement, a config claims a policy still holds. Each is a claim. Very few are paired with anything that could contradict them.
+
+**A claim without a paired, re-runnable comparison is folklore.** It may well be true. You cannot tell, and it decays.
+
+## Who this is for
+
+Not only us. The intended output is **a practice other people can run against their own systems** — not our test cases. cortex is simply the first system it was proven against, and the corpus here is *evidence the practice works*, not the product.
+
+So the bar for anything in this repo is: **could someone outside this project pick it up and apply it on day one?** If it only makes sense with our context loaded, it is not finished.
+
+## How we will know it is working
+
+We do not have this yet, and that is itself a finding. A factory with no yield measure is not a factory.
+
+Candidates, deliberately concrete:
+
+- **claims paired** — how many load-bearing claims have an executable comparison, and how many do not
+- **detectors proven** — how many guards have been *observed going red* against an injected fault, with the proof recorded
+- **time-to-detection** — when something breaks, how long before something other than a human noticing says so
+- **findings locked** — what fraction of findings became permanent cases
+- **unpinned baselines** — cases whose environment or substrate was never recorded
+
+The first honest run of these will look bad. That is the point of measuring.
 
 ---
 
@@ -23,6 +55,8 @@ In a single week, two unrelated systems — an agent security boundary and a rem
 ## The one idea
 
 **A practice written down decays. A practice encoded as a gate cannot be skipped, forgotten, or self-verified around.**
+
+The five shapes above are not five problems. They are one, seen from five angles: **a claim exists and nothing forces the comparison.** That is why the goal is stated as a pairing rather than as a list of things to test — the list can never be complete, the pairing rule can.
 
 Documents are what we write for the parts we cannot yet automate. Everything here is aimed at reducing that set.
 
