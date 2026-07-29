@@ -29,7 +29,7 @@ reimplementation (assay practice #2). Resolution order:
    standard sibling-repo layout).
 
 No cortex checkout found → every case needing one **skips cleanly**, it does
-not fail. That is the substrate contract, not an error.
+not fail. That is the `requires-cortex-checkout` contract, not an error.
 
 ## Case format — why JSON, not YAML
 
@@ -50,55 +50,97 @@ Each case carries (see `lib/types.ts` for the authoritative shape):
   what this corpus's own check found when it ran the repro itself.
 - **`provenance`** — who found it, when, which round, and the exact doc/API
   reference the text was pulled from.
-- **`captured_on`** — the substrate identity present when THIS CASE's
-  expectation was established (see "Substrate attestation" below). Not the
-  same thing as `provenance.date` — that's when the underlying finding was
-  *discovered*; `captured_on` is when it was *locked into this corpus*.
+- **`captured_on`** — the environment AND substrate identity present when THIS
+  CASE's expectation was established (see "Environment & substrate attestation"
+  below). Not the same thing as `provenance.date` — that's when the underlying
+  finding was *discovered*; `captured_on` is when it was *locked into this
+  corpus*.
 - **`status`** — `fixed` / `open` / `accepted-residual` / `unverified`.
 - **`fix`** — PR number + commit + summary, when `status: fixed`.
 - **`verification`** — `method` (`unit-import` / `spawn-hook` / `doc-grep` /
-  `none`), the `substrate` it needs, and a pointer to its `checks/*.check.ts`
-  module (or `null`, with a `note` explaining why none exists).
+  `none`), what it `requires` (`requires-cortex-checkout` / `requires-live-session`
+  / `any` — a dependency, not an identity), and a pointer to its
+  `checks/*.check.ts` module (or `null`, with a `note` explaining why none
+  exists).
 
-## Substrate attestation
+## Environment & substrate attestation
 
-**"A result without its substrate is not a result"** (charter, "Substrates").
-Rob Chuvala (NWS) caught the gap this corpus originally had: rounds 1 and 2
-were locked in with no record of what they were captured on. `runner.ts` now
-captures a `SubstrateStamp` (`lib/substrate.ts`) at the start of every run —
-OS, arch, kernel release, Bun version, and (the field that matters most,
-because every check here asserts against cortex's real code) the cortex
-checkout's HEAD commit SHA and whether it was clean. It's printed at the top
-of every run's output, before anything else.
+**"A result without its environment is not a result"** (charter,
+"Environments"). Rob Chuvala (NWS) caught the gap this corpus originally
+had: rounds 1 and 2 were locked in with no record of what they were
+captured on. The original fix answered that under the wrong name —
+`SubstrateStamp` — conflating two concepts the ecosystem keeps distinct:
+**environment** (the machine: OS/arch/kernel/Bun) and **substrate** (the
+coding harness a session runs on — Claude Code, Codex, Cursor, Pi.dev;
+soma's word, per `compass/ecosystem/CONTEXT-MAP.md`). Fixed 2026-07-29:
+the two are now separate modules, separate fields, and — because it turned
+out the corpus was never actually recording substrate at all, under any
+name — a genuine substrate capture was added alongside the rename.
 
-Each case's `captured_on` field records the same shape as it stood when the
-case's expectation was established — set once, at authoring time, never
-auto-updated by a later run (a stamp that updates itself on every run isn't
-recording a baseline, it's recording "now").
+### Environment (the machine)
+
+`runner.ts` captures an `EnvironmentStamp` (`lib/environment.ts`) at the
+start of every run — OS, arch, kernel release, Bun version, and (the field
+that matters most, because every check here asserts against cortex's real
+code) the cortex checkout's HEAD commit SHA and whether it was clean. It's
+printed at the top of every run's output, before anything else.
+
+### Substrate (the coding harness)
+
+`runner.ts` also detects the coding harness via `detectSubstrate()`
+(`lib/substrate.ts`), against the ecosystem's `HarnessId` vocabulary
+(`claude-code`, `bus-peer`, `openai-codex`, `cursor`, `gemini`, `mistral`,
+`pi-dev`, `agent-team`, `api-agent`). This is a real variable this corpus's
+results depend on: a boundary check that holds under one coding harness
+need not hold under another — different harnesses issue different tool
+calls, expand paths differently, and open files by different routes.
+
+Detection is honest, not assumed: it checks `CLAUDECODE=1` in the process
+environment (Claude Code sets this in every subprocess it spawns) and
+returns `claude-code` only when that's present. No other `HarnessId` has a
+confirmed signal here, so anything else reads as `unknown` rather than a
+guess — the same discipline the `os`/`arch`/`kernel_release` backfill below
+uses. Every case in this corpus was in fact captured while running under
+Claude Code (this repo's whole workflow runs through it), but that's
+recollection, not a record: the 12 existing cases record `substrate: null`
+with a note, not `"claude-code"` — see the per-case backfill below for the
+(circumstantial, non-definitive) commit-trailer evidence that note cites.
+
+### Per-case baseline
+
+Each case's `captured_on` field records the same shape — both environment
+and substrate — as it stood when the case's expectation was established,
+set once at authoring time, never auto-updated by a later run (a stamp
+that updates itself on every run isn't recording a baseline, it's
+recording "now").
 
 The existing `r1-*`/`r2-*` cases were backfilled honestly rather than
-retroactively: their real capture-time substrate was never recorded, so only
-the corpus's own commit date is known and every other field is `null`, with
-a `note` explaining why (do not read a later cortex commit named in a case's
-`fix` field as its verification substrate — that documents the fix, not what
-the check ran against).
+retroactively: their real capture-time environment was never recorded, so
+only the corpus's own commit date is known and every other field is
+`null`, with a `note` explaining why (do not read a later cortex commit
+named in a case's `fix` field as its verification environment — that
+documents the fix, not what the check ran against). `substrate` is `null`
+on all 12 for the same reason — no stamp was captured at the time — even
+though the note also records the circumstantial evidence (commit trailers)
+that they were, in fact, Claude Code sessions.
 
-At the end of every run, a **third signal** — `SUBSTRATE DRIFT`, alongside
-`CORPUS INTEGRITY` and `SECURITY POSTURE` below — reports, per case:
+At the end of every run, a **third signal** — `ENVIRONMENT DRIFT`,
+alongside `CORPUS INTEGRITY` and `SECURITY POSTURE` below — reports, per
+case, over BOTH environment and substrate together:
 
 - **unpinned baseline** (`captured_on` has no comparable field recorded, as
   with every backfilled case above) — loudest, because this is exactly the
   silent gap the finding named;
-- **drift** (a recorded field disagrees with this run's stamp, e.g. a
-  different `cortex_commit`) — informational, not a failure: it means this
-  result isn't directly comparable to the one on file, not that anything is
-  wrong;
+- **drift** (a recorded field disagrees with this run's readings, e.g. a
+  different `cortex_commit`, or a different `substrate`) — informational,
+  not a failure: it means this result isn't directly comparable to the one
+  on file, not that anything is wrong;
 - **match** — the quiet case.
 
-Substrate drift is never folded into `CORPUS INTEGRITY`/`SECURITY POSTURE`
-and never fails the run — same reasoning as the existing two-signal split:
-collapsing "not comparable" into pass/fail is exactly the aggregate-green
-failure shape this repo exists to avoid.
+Environment/substrate drift is never folded into `CORPUS
+INTEGRITY`/`SECURITY POSTURE` and never fails the run — same reasoning as
+the existing two-signal split: collapsing "not comparable" into pass/fail
+is exactly the aggregate-green failure shape this repo exists to avoid.
 
 ## Check contract
 
@@ -121,8 +163,8 @@ news) or an open-case fix (usually good news, but still requires a human to
 update the case's `status`/`fix` fields — a check flipping green on its own
 is not the same as the corpus's own bookkeeping being updated).
 
-**`skip`** means the substrate this case needs isn't available here (no
-cortex checkout, or a live `claude` session — several cases are
+**`skip`** means what this case `requires` isn't available here (no cortex
+checkout, or a live `claude` session — several cases are
 `requires-live-session` and cannot run until the account's weekly quota
 resets; see the corpus run notes in the branch this was built on).
 

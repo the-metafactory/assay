@@ -14,7 +14,7 @@
     {
       "verbatim": "(mechanism, no single-command repro given) — a Write to a boundary-weakening path (e.g. <allowed-workspace>/.claude/settings.json) inside an allowedDirs root succeeds because decidePath only checks containment/read-only, never the filename's own security significance.",
       "source": "GitHub the-metafactory/cortex, issue comment 5084213029, finding F5",
-      "substrate": "requires-cortex-checkout",
+      "requires": "requires-cortex-checkout",
       "outcome": "Reproduced by this corpus's unit-import check: decidePath(\"Write\", \"<fixture>/.claude/settings.json\", {allowedDirs:[\"<fixture>\"], readOnlyDirs:[]}) returns allow:true — nothing about the filename is special-cased."
     }
   ],
@@ -25,14 +25,15 @@
     "kernel_release": null,
     "bun_version": null,
     "cortex_commit": null,
-    "note": "Backfilled after the fact (assay substrate-attestation fix, prompted by Rob Chuvala/NWS: \"what substrate were those captured on? If we didn't record it, we have cases locked against an unpinned baseline.\"). This corpus's runner captured no substrate stamp before this fix, so the only thing honestly knowable is the date this case entered the corpus — from the corpus's own commit (2173581, 2026-07-27T11:57:28+12:00), NOT from provenance.date above (that's when the underlying finding was discovered, a different event). OS/arch/kernel/bun-version/cortex-commit were never recorded at capture time and are not reconstructable — do not infer them from the machine running this backfill, or from the cortex commit named in this case's `fix` field (that documents the FIX, not the verification substrate)."
+    "substrate": null,
+    "note": "Backfilled after the fact (assay environment-attestation fix, prompted by Rob Chuvala/NWS: \"what substrate were those captured on? If we didn't record it, we have cases locked against an unpinned baseline.\" — his question named the gap; this corpus originally answered it by capturing environment identity (OS/arch/kernel/bun/cortex-commit) under the wrong name, `SubstrateStamp` — see the ubiquitous-language fix that renamed it to `EnvironmentStamp` (lib/environment.ts) and added a genuine `substrate` field, meaning the coding harness (lib/substrate.ts), using the ecosystem's `HarnessId` vocabulary). This corpus's runner captured no environment stamp before the original fix, so the only thing honestly knowable is the date this case entered the corpus — from the corpus's own commit (2173581, 2026-07-27T11:57:28+12:00), NOT from provenance.date above (that's when the underlying finding was discovered, a different event). OS/arch/kernel/bun-version/cortex-commit were never recorded at capture time and are not reconstructable — do not infer them from the machine running this backfill, or from the cortex commit named in this case's `fix` field (that documents the FIX, not the verification environment). `substrate` (coding harness) is also left `null`: this case was in fact authored during a Claude Code session — commit 2173581 carries a `Co-Authored-By: Claude Opus 5` trailer, and the later environment-attestation commit 94e6598 carries a `Claude-Session: https://claude.ai/code/session_...` trailer, both consistent with Claude Code — but neither is a captured substrate stamp, so this is recollection backed by circumstantial commit evidence, not a record. Left `null` rather than asserted `claude-code`, per this corpus's own no-guessing rule."
   },
   "expected": "A deterministic boundary-file denylist should deny writes to a maintained set of self-modifying config/hook paths regardless of containment (i.e. even inside an otherwise-writable allowedDirs root) — because these paths' significance is not 'is it in scope', it's 'does writing it change what future sessions are allowed to do'.",
   "status": "open",
   "fix": null,
   "verification": {
     "method": "unit-import",
-    "substrate": "requires-cortex-checkout",
+    "requires": "requires-cortex-checkout",
     "check": "checks/r2-f5.check.ts",
     "note": "Unit-imports decidePath from path-guard.hook.ts and calls it with a Write to a boundary-weakening filename (.claude/settings.json) inside an allowedDirs-only fixture (no readOnlyDirs entry covering it). Asserts allow:true — i.e. this check expects the finding's mechanism to still hold, matching status:open."
   },

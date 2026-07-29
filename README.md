@@ -56,11 +56,13 @@ Stating this matters, because a factory that believed it was also a discovery en
 | **Release** | The artifact behaves as announced. **Detectors prove they can still fire.** |
 | **Continuous** | Drift. Decay. The things that are only visible over time and never at build. |
 
-### Substrates — *where* it runs, which is part of the assertion
+### Environments — *where* it runs, which is part of the assertion
 
-A result without its substrate is not a result. "`bwrap` works" is not a fact; it is a fact relative to a kernel, a namespace policy, and whether you are in a container.
+A result without its environment is not a result. "`bwrap` works" is not a fact; it is a fact relative to a kernel, a namespace policy, and whether you are in a container.
 
-| Substrate | What is only true here |
+*(Note on terms: "environment" here means the machine — kernel, namespace, container/VM/host tier. It is a distinct concept from **substrate**, the coding harness a session runs on — Claude Code, Codex, Cursor, Pi.dev; see `evals/execution-boundary/lib/substrate.ts`. An earlier version of this repo used "substrate" for both, which was a naming error, corrected 2026-07-29.)*
+
+| Environment | What is only true here |
 |---|---|
 | Ephemeral container | fast iteration; most unit and contract work |
 | VM (OrbStack / Tart / ProxMox) | real kernel, systemd, namespaces |
@@ -108,7 +110,7 @@ The gate that makes this a factory rather than a test suite.
 
 One week produced: a regression test that could not fail, three broken verification harnesses, and a check that read through the same faulty alias it was verifying. In every case the code was fine and **the instrument was wrong**.
 
-So: can this test fail? Does it assert what it claims? Is it measuring the substrate or the code?
+So: can this test fail? Does it assert what it claims? Is it measuring the environment or the code?
 
 ---
 
@@ -118,7 +120,7 @@ Two contributions arrived independently, from opposite ends of the problem, and 
 
 **Rob Chuvala (NorthWoods Sentinel)** brought the offensive read: this is control-assurance, the meta-gate is the keystone, and — the important limit — *assay locks in known-good, it does not find unknown-bad.* He named the composition himself: **find upstream, lock downstream.**
 
-**Vincent Zontini** brought the locking mechanism, from SAN hardware health testing: pin the substrate, capture known-good output, and treat any variance as a finding. A control file listing *expected* paths makes a **missing** file a variance — which is the silent-detector fix in one line.
+**Vincent Zontini** brought the locking mechanism, from SAN hardware health testing: pin the environment, capture known-good output, and treat any variance as a finding. A control file listing *expected* paths makes a **missing** file a variance — which is the silent-detector fix in one line.
 
 Put together:
 
@@ -138,12 +140,12 @@ Neither piece is sufficient alone. A discovery engine with nothing downstream re
 ## Layout
 
 ```
-evals/        graded case corpora — every finding becomes a permanent case
-gates/        executable checks, by lifecycle stage
-scenarios/    rerunnable end-to-end and recovery runs
-substrates/   environment definitions + desired-state reset
-ideas/        the tray — rough thoughts, no ceremony required
-docs/         charter, taxonomy, decisions
+evals/         graded case corpora — every finding becomes a permanent case
+gates/         executable checks, by lifecycle stage
+scenarios/     rerunnable end-to-end and recovery runs
+environments/  environment definitions + desired-state reset
+ideas/         the tray — rough thoughts, no ceremony required
+docs/          charter, taxonomy, decisions
 ```
 
 ## Contributing
