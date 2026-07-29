@@ -56,7 +56,7 @@ In a single week, two unrelated systems — an agent security boundary and a rem
 
 **A practice written down decays. A practice encoded as a gate cannot be skipped, forgotten, or self-verified around.**
 
-The five shapes below are not five problems. They are one, seen from five angles: **a claim exists and nothing forces the comparison.** That is why the goal is stated as a pairing rather than as a list of things to test — the list can never be complete, the pairing rule can.
+The five shapes above are not five problems. They are one, seen from five angles: **a claim exists and nothing forces the comparison.** That is why the goal is stated as a pairing rather than as a list of things to test — the list can never be complete, the pairing rule can.
 
 Documents are what we write for the parts we cannot yet automate. Everything here is aimed at reducing that set.
 
