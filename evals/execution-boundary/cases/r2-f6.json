@@ -14,7 +14,7 @@
     {
       "verbatim": "(mechanism, no single-command repro given) — a Grep call with no `path` field, invoked with the hook's process.cwd() outside every allowedDirs/readOnlyDirs entry, is auto-granted without cortex ever resolving or checking cwd against the policy.",
       "source": "GitHub the-metafactory/cortex, issue comment 5084213029, finding F6",
-      "substrate": "requires-cortex-checkout",
+      "requires": "requires-cortex-checkout",
       "outcome": "Reproduced by this corpus's spawn-hook check: path-guard.hook.ts is spawned with CORTEX_PATH_GUARD scoping allowedDirs to one fixture directory, cwd set (as a spawn option) to a DIFFERENT fixture directory outside that scope, and a Grep call with no `path` field — the hook still emits permissionDecision:allow."
     }
   ],
@@ -25,14 +25,15 @@
     "kernel_release": null,
     "bun_version": null,
     "cortex_commit": null,
-    "note": "Backfilled after the fact (assay substrate-attestation fix, prompted by Rob Chuvala/NWS: \"what substrate were those captured on? If we didn't record it, we have cases locked against an unpinned baseline.\"). This corpus's runner captured no substrate stamp before this fix, so the only thing honestly knowable is the date this case entered the corpus — from the corpus's own commit (2173581, 2026-07-27T11:57:28+12:00), NOT from provenance.date above (that's when the underlying finding was discovered, a different event). OS/arch/kernel/bun-version/cortex-commit were never recorded at capture time and are not reconstructable — do not infer them from the machine running this backfill, or from the cortex commit named in this case's `fix` field (that documents the FIX, not the verification substrate)."
+    "substrate": null,
+    "note": "Backfilled after the fact (assay environment-attestation fix, prompted by Rob Chuvala/NWS: \"what substrate were those captured on? If we didn't record it, we have cases locked against an unpinned baseline.\" — his question named the gap; this corpus originally answered it by capturing environment identity (OS/arch/kernel/bun/cortex-commit) under the wrong name, `SubstrateStamp` — see the ubiquitous-language fix that renamed it to `EnvironmentStamp` (lib/environment.ts) and added a genuine `substrate` field, meaning the coding harness (lib/substrate.ts), using the ecosystem's `HarnessId` vocabulary). This corpus's runner captured no environment stamp before the original fix, so the only thing honestly knowable is the date this case entered the corpus — from the corpus's own commit (2173581, 2026-07-27T11:57:28+12:00), NOT from provenance.date above (that's when the underlying finding was discovered, a different event). OS/arch/kernel/bun-version/cortex-commit were never recorded at capture time and are not reconstructable — do not infer them from the machine running this backfill, or from the cortex commit named in this case's `fix` field (that documents the FIX, not the verification environment). `substrate` (coding harness) is also left `null`: this case was in fact authored during a Claude Code session — commit 2173581 carries a `Co-Authored-By: Claude Opus 5` trailer, and the later environment-attestation commit 94e6598 carries a `Claude-Session: https://claude.ai/code/session_...` trailer, both consistent with Claude Code — but neither is a captured substrate stamp, so this is recollection backed by circumstantial commit evidence, not a record. Left `null` rather than asserted `claude-code`, per this corpus's own no-guessing rule."
   },
   "expected": "In the empty-token branch (Glob/Grep with no explicit path), the hook should resolve process.cwd() and containment-check it against allowedDirs/readOnlyDirs before granting, instead of unconditionally trusting that dispatch already scoped it correctly.",
   "status": "open",
   "fix": null,
   "verification": {
     "method": "spawn-hook",
-    "substrate": "requires-cortex-checkout",
+    "requires": "requires-cortex-checkout",
     "check": "checks/r2-f6.check.ts",
     "note": "Spawns path-guard.hook.ts with a scoped CORTEX_PATH_GUARD, an out-of-scope cwd, and a path-less Grep call. Asserts the hook currently grants (auto-approves) despite the out-of-scope cwd — i.e. this check expects the vulnerability to reproduce, matching status:open."
   }

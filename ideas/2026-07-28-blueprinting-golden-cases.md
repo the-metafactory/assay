@@ -2,6 +2,13 @@
 
 *Vincent Zontini's method, from the community thread. Written up by Luna; the idea and the working precedent are Vincent's.*
 
+> **Editor's note (2026-07-29):** the "substrate" below is what this repo now
+> calls **environment** — the machine (kernel, namespace policy, container
+> image), not the coding harness the ecosystem now reserves the word
+> "substrate" for. Left as originally written rather than rewritten, since
+> this is a signed contribution; see `evals/execution-boundary/lib/environment.ts`
+> and the top-level README's "Environments" section for the corrected terms.
+
 ## The method, in his words
 
 An early version of SAN hardware health testing: a script logged into every component, ran all the health commands, and saved the output. That output was compared against known-good output. **Any variance was a check failure**, and the variance notified a storage admin.

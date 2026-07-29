@@ -14,7 +14,7 @@
     {
       "verbatim": "Exploit preconditions: production runs with sovereigntyEnforce off (the default) and an operator or the client believes the sovereignty guarantee is live. Repro status: not attempted — the default is confirmed in code.",
       "source": "cortex docs/security/reviews/2026-07-23-nws-security-review.md §4 F3",
-      "substrate": "any"
+      "requires": "any"
     }
   ],
   "captured_on": {
@@ -24,7 +24,8 @@
     "kernel_release": null,
     "bun_version": null,
     "cortex_commit": null,
-    "note": "Backfilled after the fact (assay substrate-attestation fix, prompted by Rob Chuvala/NWS: \"what substrate were those captured on? If we didn't record it, we have cases locked against an unpinned baseline.\"). This corpus's runner captured no substrate stamp before this fix, so the only thing honestly knowable is the date this case entered the corpus — from the corpus's own commit (2173581, 2026-07-27T11:57:28+12:00), NOT from provenance.date above (that's when the underlying finding was discovered, a different event). OS/arch/kernel/bun-version/cortex-commit were never recorded at capture time and are not reconstructable — do not infer them from the machine running this backfill, or from the cortex commit named in this case's `fix` field (that documents the FIX, not the verification substrate)."
+    "substrate": null,
+    "note": "Backfilled after the fact (assay environment-attestation fix, prompted by Rob Chuvala/NWS: \"what substrate were those captured on? If we didn't record it, we have cases locked against an unpinned baseline.\" — his question named the gap; this corpus originally answered it by capturing environment identity (OS/arch/kernel/bun/cortex-commit) under the wrong name, `SubstrateStamp` — see the ubiquitous-language fix that renamed it to `EnvironmentStamp` (lib/environment.ts) and added a genuine `substrate` field, meaning the coding harness (lib/substrate.ts), using the ecosystem's `HarnessId` vocabulary). This corpus's runner captured no environment stamp before the original fix, so the only thing honestly knowable is the date this case entered the corpus — from the corpus's own commit (2173581, 2026-07-27T11:57:28+12:00), NOT from provenance.date above (that's when the underlying finding was discovered, a different event). OS/arch/kernel/bun-version/cortex-commit were never recorded at capture time and are not reconstructable — do not infer them from the machine running this backfill, or from the cortex commit named in this case's `fix` field (that documents the FIX, not the verification environment). `substrate` (coding harness) is also left `null`: this case was in fact authored during a Claude Code session — commit 2173581 carries a `Co-Authored-By: Claude Opus 5` trailer, and the later environment-attestation commit 94e6598 carries a `Claude-Session: https://claude.ai/code/session_...` trailer, both consistent with Claude Code — but neither is a captured substrate stamp, so this is recollection backed by circumstantial commit evidence, not a record. Left `null` rather than asserted `claude-code`, per this corpus's own no-guessing rule."
   },
   "expected": "policy.sovereignty.enforce must be a real, documented, principal-settable config key (not merely a constructor-only test hook unreachable from any config file), threaded identically to both consumers that evaluate sovereignty, defaulting to false with the posture honestly logged at boot as audit-only, not enforcing.",
   "status": "fixed",
@@ -35,7 +36,7 @@
   },
   "verification": {
     "method": "doc-grep",
-    "substrate": "requires-cortex-checkout",
+    "requires": "requires-cortex-checkout",
     "check": "checks/r1-f3.check.ts",
     "note": "Greps src/cortex.ts for the single resolved `sovereigntyEnforce` value and confirms it is passed to BOTH consumer construction sites — the exact asymmetry the EBH-6 investigation found and closed. Does not spin up a live bus/consumer; that would need a running stack."
   },

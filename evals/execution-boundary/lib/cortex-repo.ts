@@ -24,7 +24,7 @@ const MARKER_REL_PATH = "src/runner/hooks/path-guard.hook.ts";
  *
  * Returns `null` when no checkout is found. Callers MUST skip cleanly, not
  * fail, when this returns `null` — "requires-cortex-checkout" is a real
- * substrate constraint, not an error.
+ * requirement, not an error.
  */
 export function findCortexRepo(): string | null {
   const fromEnv = process.env.ASSAY_CORTEX_REPO_PATH;

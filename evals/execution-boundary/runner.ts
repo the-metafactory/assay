@@ -12,14 +12,15 @@
 // case it means the vulnerability still reproduces as described. `fail`
 // means reality has DIVERGED from the case (which can be good news — a
 // silent fix nobody updated the case for — or bad news — a regression; the
-// detail text says which). `skip` means the substrate this case needs isn't
+// detail text says which). `skip` means what this case requires isn't
 // available here (no cortex checkout, or a live claude session).
 //
 // Usage: bun run evals/execution-boundary/runner.ts [--round 1|2] [--id r1-f1,...]
 
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { assessDrift, captureSubstrateStamp, formatStamp } from "./lib/substrate";
+import { assessDrift, captureEnvironmentStamp, formatEnvironmentStamp } from "./lib/environment";
+import { detectSubstrate, formatSubstrate } from "./lib/substrate";
 import type { CaseRecord, CheckFn, CheckOutcome } from "./lib/types";
 
 const HERE = import.meta.dir;
@@ -108,15 +109,19 @@ async function main(): Promise<void> {
   if (args.round) cases = cases.filter((c) => c.round === args.round);
   if (args.ids) cases = cases.filter((c) => args.ids?.includes(c.id));
 
-  // A result without its substrate is not a result (README, "Substrates").
-  // Captured once per run — every case in this run was checked against the
-  // same cortex checkout — and printed before anything else, so it's the
-  // first thing anyone reading the output sees, not a footnote.
-  const substrate = captureSubstrateStamp();
+  // A result without its environment is not a result (README,
+  // "Environments"). Captured once per run — every case in this run was
+  // checked against the same cortex checkout — and printed before
+  // anything else, so it's the first thing anyone reading the output
+  // sees, not a footnote. `substrate` (the coding harness) is a distinct
+  // concept, detected separately — see lib/substrate.ts.
+  const environment = captureEnvironmentStamp();
+  const substrateDetection = detectSubstrate();
 
   console.log(`execution-boundary corpus — ${cases.length} case(s)`);
-  console.log(`substrate: ${formatStamp(substrate)}`);
-  console.log(`captured:  ${substrate.captured_at}\n`);
+  console.log(`environment: ${formatEnvironmentStamp(environment)}`);
+  console.log(`substrate:   ${formatSubstrate(substrateDetection)}  (${substrateDetection.note})`);
+  console.log(`captured:    ${environment.captured_at}\n`);
 
   const results: RunOutcome[] = [];
   for (const c of cases) {
@@ -165,16 +170,19 @@ async function main(): Promise<void> {
   );
 
   // THIRD SIGNAL, same spirit as the two above: never collapsed into
-  // pass/fail, because substrate drift is information, not a verdict. A
-  // case whose captured_on disagrees with this run's stamp isn't wrong —
-  // it's a result that isn't directly comparable to the one on file, which
-  // is exactly the silent gap Rob Chuvala's review named (README: "a result
-  // without its substrate is not a result").
+  // pass/fail, because environment/substrate drift is information, not a
+  // verdict. A case whose captured_on disagrees with this run's readings
+  // isn't wrong — it's a result that isn't directly comparable to the one
+  // on file, which is exactly the silent gap Rob Chuvala's review named
+  // (README: "a result without its environment is not a result"). Covers
+  // BOTH concepts this corpus tracks per case — the machine (environment)
+  // and the coding harness (substrate) — under one signal, same as
+  // `captured_on` covers both under one record.
   const unknownBaseline: string[] = [];
   const drifted: { id: string; differences: string[] }[] = [];
   let matched = 0;
   for (const c of cases) {
-    const assessment = assessDrift(c.captured_on, substrate);
+    const assessment = assessDrift(c.captured_on, environment, substrateDetection.substrate);
     if (assessment.kind === "unknown") unknownBaseline.push(c.id);
     else if (assessment.kind === "drift") drifted.push({ id: c.id, differences: assessment.differences });
     else matched++;
@@ -182,18 +190,18 @@ async function main(): Promise<void> {
 
   if (unknownBaseline.length > 0) {
     console.log(
-      `SUBSTRATE DRIFT   ⚠️  ${unknownBaseline.length} case(s) with an UNPINNED baseline (captured_on never recorded a comparable substrate) — ` +
+      `ENVIRONMENT DRIFT ⚠️  ${unknownBaseline.length} case(s) with an UNPINNED baseline (captured_on never recorded a comparable environment or substrate) — ` +
         unknownBaseline.join(", "),
     );
   }
   if (drifted.length > 0) {
-    console.log(`SUBSTRATE DRIFT   ℹ️  ${drifted.length} case(s) captured on a DIFFERENT substrate than this run:`);
+    console.log(`ENVIRONMENT DRIFT ℹ️  ${drifted.length} case(s) captured on a DIFFERENT environment/substrate than this run:`);
     for (const d of drifted) console.log(`                  ${d.id}: ${d.differences.join(", ")}`);
   }
   if (unknownBaseline.length === 0 && drifted.length === 0) {
-    console.log(`SUBSTRATE DRIFT   none — ${matched}/${cases.length} case(s) match this run's substrate`);
+    console.log(`ENVIRONMENT DRIFT none — ${matched}/${cases.length} case(s) match this run's environment/substrate`);
   } else if (matched > 0) {
-    console.log(`                  (${matched}/${cases.length} case(s) match this run's substrate)`);
+    console.log(`                  (${matched}/${cases.length} case(s) match this run's environment/substrate)`);
   }
 
   if (counts.fail > 0) {
