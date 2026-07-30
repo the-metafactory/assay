@@ -1,0 +1,40 @@
+# agents-md.yaml — repo-specific agent rules configuration
+# Used by `arc upgrade compass` to generate CLAUDE.md from the ecosystem
+# template. See compass/metafactory/docs/design-claude-md-sync.md for the
+# full design spec, and CLAUDE.md's own "CLAUDE.md Management" section
+# (once generated) for the do-not-hand-edit discipline.
+
+template: compass-standards
+
+# Which rule file formats to generate
+generate:
+  - format: claude-md
+
+# Placeholder values (substituted into templates)
+repo_name: assay
+repo_description: "A practice for knowing what is true about a system, at the pace software is now built"
+# Honest, not boilerplate: this repo has no arc-manifest.yaml and no
+# package.json version field yet, and no deploy step (it is a corpus/runner
+# repo, not a deployed service). Do not copy the ecosystem-default
+# "arc-manifest.yaml" / "arc upgrade assay" values here until those are
+# actually true of this repo — see CONTEXT.md's own "never fabricate an
+# attestation" discipline, which applies just as much to this file.
+deploy_command: "none — assay is a corpus/runner repo; run via `bun run evals/<corpus>/runner.ts`, no deploy step"
+version_source: "none yet — no arc-manifest.yaml or package.json version field in this repo"
+release_title_format: '"assay vX.Y.Z — Short Description"'
+worktree_pattern: "../assay-{slug}"
+sop_path_prefix: "compass/"
+
+# No project-specific labels beyond the ecosystem standard set.
+extra_labels: []
+
+# Repo-specific sections injected at marked positions in the template.
+# No `after:domain-context` (wire-grounding) section: assay does not touch
+# the bus/wire (subject grammar, envelope, identity, transport, discovery,
+# admission) — the slot renders empty for repos with no wire surface, by
+# template design.
+sections:
+  - position: "after:description"
+    file: docs/agents-md/architecture.md
+  - position: "after:critical-rules"
+    file: docs/agents-md/critical-rules.md
