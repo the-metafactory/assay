@@ -1,6 +1,6 @@
 # Design: the testing factory
 
-**Status:** Draft for review — decisions DD-1..DD-8 are proposals, not settled
+**Status:** Draft for review — decisions DD-1..DD-10 are proposals, not settled
 **Author:** Luna (with Andreas)
 **Contributors whose work this specifies:** Robert Chuvala (NorthWoods Sentinel), Vincent Zontini, Magnús Smárason
 **Refs:** [`../README.md`](../README.md) (charter) · [`../CONTEXT.md`](../CONTEXT.md) (language) · `ideas/` (source notes) · [vision#4 §5a](https://github.com/the-metafactory/vision/issues/4) · cortex#2341
@@ -38,6 +38,8 @@ Stated first, because it constrains every decision after it. **We are rediscover
 | Cross-layer contract | **Consumer-driven contract testing** | Pact |
 | Detector precision / alert fatigue | **Precision–recall**; SLO alerting | Google SRE ch. 6 |
 | Graded case corpora | **LLM evals** — pass@k, LLM-as-judge, rubric scoring | OpenAI Evals, DeepEval, UK AISI Inspect |
+| The whole practice | **Eval-driven development (EDD)** — TDD adapted for non-deterministic output | Airbnb Engineering, *Lessons from Evaluating GenAI at Scale* |
+| Agent traces, trajectory eval, data-quality blind spots | **Agent observability** (distinct from LLM observability) | Monte Carlo, *Agent Observability*; OTel GenAI semconv |
 
 ### What is genuinely ours
 
@@ -47,6 +49,22 @@ Being fair to the work, four things do not map cleanly onto prior art and are th
 - **Three-signal reporting** — separating *did the case behave as documented* from *is the system safe* from *is the baseline pinned*. Standard harnesses collapse these into pass/fail, which is how an open finding hides under a green rollup.
 - **Substrate attestation for agent work.** Labs pin model versions. Nobody pins the **coding harness** — and a boundary check that holds under one harness need not hold under another.
 - **The agent execution-boundary corpus** itself.
+
+---
+
+## 2b. A sixth failure shape: the healthy trace
+
+The charter names five shapes, all found in our own systems. A sixth arrives from outside, and it has been independently observed twice, which is the bar the other five met.
+
+> **The healthy trace.** Every step is correct, every span is green, the agent did exactly what it was told — and the answer is wrong, because the input was stale, unindexed, or never loaded.
+
+Monte Carlo puts it precisely: *"plenty of bad answers start out as a stale table or a broken pipeline… your trace will look perfectly healthy, because the agent did exactly what it was told with the numbers it was handed."*
+
+We have our own instance and did not recognise it as a shape at the time. Magnús's audit found **455 of 602 knowledge files never added to the index that loads them** — so they existed and influenced nothing. Every read succeeded. Every trace would have looked healthy. The corpus was simply not there.
+
+**Why it belongs with the other five:** it is the same mechanism one layer upstream. A claim ("the agent has this context") with nothing forcing the comparison. Process correctness is *asserted by the trace* and mistaken for answer correctness.
+
+**What it implies for us:** the inputs an agent is handed are themselves claims requiring paired comparisons — is the index complete, is the file loaded, is the map current. Tracing the agent will never surface it, because the agent is behaving perfectly.
 
 ---
 
@@ -91,6 +109,10 @@ Moving a case from exact to bounded **requires a commit explaining why** (guardi
 ### DD-6 — Observability rides OpenTelemetry GenAI semantic conventions
 **Decision:** use OTel GenAI semconv for session traces rather than a bespoke schema.
 
+**Also required — trajectory evaluation, not just final output.** Two independent sources say the same thing: Airbnb evaluates agent-level correctness, sub-agent correctness, **and** path efficiency; Monte Carlo notes agents produce hierarchical traces where final-output checks miss tool-selection errors and infinite loops. Our corpus currently checks only terminal decisions (allow/deny) — correct for boundary work, insufficient for anything behavioural.
+
+**And the loop closes the other way:** production failures should become cases automatically. That is our findings-become-regressions rule, independently arrived at, and it is the capability both sources flag as inconsistently implemented in existing tools.
+
 **Why:** it is the standard the tooling ecosystem is converging on, and it serves three separate needs at once — Vincent's observability substrate, Magnús's guards, and evals over **real traces** rather than only synthetic cases. That last one is a genuine gap: our corpus never observes a live session.
 
 ### DD-7 — Environment before corpus
@@ -100,6 +122,34 @@ Moving a case from exact to bounded **requires a commit explaining why** (guardi
 
 ### DD-8 — The audience is external
 **Decision:** every artifact is judged by *"could someone outside this project apply it on day one?"* The shareable output is the **practice**; cortex is the first proving ground and the corpus is evidence, not the product.
+
+### DD-9 — Three evaluation layers; we currently have only the first
+**Decision:** adopt Airbnb's three-layer stack and state plainly where we sit.
+
+| Layer | What it does | Our status |
+|---|---|---|
+| **1 — programmatic** | deterministic checks: format, bounds, validity, exact comparison | **all 12 cases** |
+| **2 — LLM-as-judge** | nuanced qualities against a rubric, one dimension per judge | **none** |
+| **3 — human** | validates edge cases, recalibrates the layers above | **none** |
+
+**Why it matters:** our corpus is entirely layer 1, which is fine for boundary checks (allow/deny is deterministic) and useless for anything about agent *quality*. Claiming eval coverage while holding only layer 1 would be an aggregate green about our own evals.
+
+**Constraint carried from Airbnb:** never build "God evaluators" — each judge targets exactly one dimension. 3–5 specialised, well-calibrated judges beat many noisy ones. That is our detector-precision standard restated for judges.
+
+**Also carried:** golden sets must contain **failures**. *"You can't test discernment without negative examples."* We have this accidentally right — an `open` case is a negative example, which is why an open case passing means the vulnerability still reproduces.
+
+### DD-10 — A judge is untrusted until calibrated; and if humans disagree, stop
+**Decision:** no LLM-as-judge enters service without calibration against 50–100 human-labelled examples, measured agreement in the high 80s–90s, disagreements analysed, and periodic recalibration as failure modes shift.
+
+**Why:** *"an uncalibrated judge creates false confidence."* That is precisely our silent-detector shape wearing eval clothing — an instrument that reports confidently while detecting nothing.
+
+**Note the symmetry with DD-3.** Fault injection proves a detector can fire; calibration proves a judge can discriminate. **They are the same rule: prove the instrument before trusting its output.** That is the meta-gate generalised, and it is the strongest argument that the meta-gate is the keystone rather than a nicety.
+
+**The harder half — a rule we should have applied to ourselves:** *"if your experts disagree on a label, stop. Solve human disagreement before automating anything."*
+
+Four people used **substrate** to mean two different things in this repo's first week. Had we automated a judge on top of that disagreement, we would have baked the confusion into scores nobody could interpret. So `CONTEXT.md` was not bureaucracy — it was a precondition, and we built it late.
+
+**Corollary:** rubric ambiguity is the enemy. Prefer explicit error categories over vague standards.
 
 ---
 
@@ -125,6 +175,7 @@ The charter names five gates but not what passing means. Proposed:
 | **mutation score** | mutants killed ÷ mutants generated, over corpus checks | **0 — never run** |
 | **detectors proven** | guards with a recorded fault-injection proof ÷ total guards | **0 of n** |
 | **time-to-detection** | wall-clock from fault introduced to a non-human signal | unmeasured |
+| **judge agreement** | judge-vs-human label agreement on the calibration set (DD-10) | n/a — no judges exist |
 | **findings locked** | findings with a permanent case ÷ total findings | 12 of 12 for NWS r1–r2; 0% elsewhere |
 | **unpinned baselines** | cases with no comparable environment+substrate recorded | **12 of 12** |
 
