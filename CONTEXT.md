@@ -21,6 +21,133 @@ durable.
 
 ## Language
 
+### What assay is — and what a factory is
+
+**Factory**:
+A **member-operated production capability** — an operator, their agents, and
+their installed stack, able to turn models into outcomes. A website factory
+ships production sites; a document factory, documents; an assessment factory,
+assessments. Factories produce **products** and live at the factory layer.
+Defined in `vision/factory-of-factories.md`; **assay does not own this word**.
+
+The load-bearing part is *member-operated*: a factory is an instance somebody
+runs, not an artifact somebody distributes. Two consequences — a factory is
+never a repo, and the test of whether a factory layer is earning its keep is
+that *"adding the Nth factory must require no new machinery, only a new
+capability declaration."*
+_Avoid_: calling a repo, a tool, or a practice a factory. **assay is not a
+factory** (resolved 2026-07-31) — see below.
+
+**assay** (the thing this repo distributes):
+A **diagnostic instrument**: install it, point it at a project, and it reports
+what that project can currently *prove* about itself — and where it cannot.
+It is the instrument a verification factory would use, not the factory.
+
+The name is the definition: an assay determines what something actually
+contains, as opposed to what it is labelled as.
+
+Why not a factory: a factory is member-operated and produces products; assay
+is distributed and produces a **report**. And on the vision doc's own test we
+would fail today — our corpus is cortex-specific, so nothing here yet makes a
+*second* project's verification cheaper than the first. That is the bar to
+clear before the word applies, and clearing it is the point.
+_Avoid_: "the testing factory" (the framing this repo launched with, and an
+overclaim — corrected 2026-07-31), framework, platform, suite.
+
+**Diagnostic report** (the v1 product):
+What an operator gets from a run. Portable measures, each derived from a real
+observed failure rather than invented: **mutation score** (can the tests fail
+at all), **unpinned baselines** (do results record what they were captured
+against), **unresolvable references** (does config still point at reality),
+**unproven detectors** (has each guard ever been observed firing), and an
+**aggregate-green check** (does any rollup hide an open finding).
+_Avoid_: score, grade, audit (implies a pass/fail verdict; the report is a
+statement of what is and is not currently provable).
+
+**Remediation**:
+The fix a **finding** carries. Never advice alone: a remediation names the
+remedy, its cost, its **provenance** (the real failure that taught it), and —
+load-bearing — **the measure that will move if it worked**.
+
+That last part subjects our own advice to the same rule as everything else
+(`README.md`, the goal): a remedy is a claim, so it is paired with an
+executable comparison that can fail. "Add attestation" is advice; "add
+attestation, then `unpinned baselines` drops to 0 — re-run and check" is a
+remediation. If the measure does not move, the advice was wrong and the
+report says so.
+
+Two standing constraints. **Mechanical and judgement remediations are marked
+distinctly** — "run this command" and "decide whether your risk profile
+warrants this" are different kinds of claim, and blurring them turns a
+diagnostic into a nag. And **remediation is never auto-applied**: writing to
+a project we have not seen, on a heuristic, is the declared-boundary failure
+with a write path attached. The engagement model is *find → recommend →
+re-verify on request* (adopted from NWS's, deliberately).
+_Avoid_: fix (a remediation is proposed, not performed), suggestion (too
+weak — a remediation carries a verifiable consequence), autofix.
+
+**Claim**:
+A statement a project makes about itself that could be false. A detector
+claims coverage; an aggregate claims health; a fix claims completeness; a
+boundary claims enforcement; a config claims a policy still holds. The goal
+(`README.md`) is that every claim is **paired** with an executable comparison
+that can fail. A claim with no such pairing is **folklore** — possibly true,
+unprovable, and decaying.
+_Avoid_: assertion (means something narrower in test code), assumption (a
+claim is stated; an assumption is unstated — that difference is the point).
+
+**Claim manifest**:
+The accumulated record of a project's declared claims and the comparison
+paired with each. **Not a prerequisite** (resolved 2026-07-31): assay infers
+what it can from what a project already has, and asks only where inference
+cannot reach — most notably *what are your detectors*, which nothing in a
+repo reliably announces.
+
+The manifest is therefore a **by-product of using the tool, not a precondition
+for it**. First run costs no configuration; the manifest is what a project
+accumulates as it answers. This is deliberate — requiring the manifest up
+front is conceptually purer and empirically fatal, because nobody has one and
+the tool would be abandoned before showing value.
+_Avoid_: config, policy file (both imply rules imposed on the project; the
+manifest records what the project says about itself), inventory.
+
+**Instrument** (what is distributed):
+The portable half of this repo — the measures, the report, the remediation
+catalogue. This is what `arc install assay` places on a machine, and it is
+deliberately **the only thing installed** (resolved 2026-07-31).
+
+The distinction that governs the split: the instrument is **portable**, a
+corpus is **subject-specific**. Installing `execution-boundary`'s twelve
+cortex security findings onto a stranger's machine would be noise — they came
+for a tool that runs against *their* project, not for our findings.
+
+A corpus therefore stays in the repo as **published evidence**: readable,
+citable, runnable here, not installed there. It is how someone checks that
+the practice actually works before adopting it. When a second corpus exists,
+corpora become separately installable — designing that extension point now,
+for one corpus, would be building a plugin system for a single plugin.
+_Avoid_: core (implies the corpus is peripheral — it is the evidence), engine,
+runtime.
+
+**Static measure** / **live measure**:
+A **static** measure is computable from a checkout alone — no credentials, no
+running system, no network. A **live** measure requires a running target.
+
+v1 is **static only** (resolved 2026-07-31). Every measure runs on a stranger's
+machine in minutes with nothing to authorise and nothing to leak. Where a
+measure cannot be fully answered statically it **degrades honestly** rather
+than being dropped: "we can see N guards and none carries an injection proof"
+is still the finding, and is exactly the claim-without-comparison the goal
+names.
+
+This is a real limitation, stated rather than hidden: the silent detector and
+the healthy trace are **runtime** shapes, and a static instrument cannot
+observe them directly — only their absence of proof. Live measures arrive with
+the trace work (`docs/design-testing-factory.md` DD-6).
+_Avoid_: offline/online (means something different in eval literature —
+offline evals are pre-production, which is orthogonal to whether a target is
+running), scan.
+
 ### The corpus and its pieces
 
 **Corpus**:
@@ -316,6 +443,17 @@ signals are never merged):
   manifest, and never enforced at the moment it matters.
 
 ## Boundary with adjacent contexts
+
+**`factory` — vision owns it; assay is not one.** `vision/factory-of-factories.md`
+defines a factory as a member-operated production capability (operator +
+agents + installed stack, turning models into outcomes). assay is the
+**instrument** such a factory would use, not a factory itself — see
+§Language. The definition currently lives only in vision prose, which is
+exactly how this repo came to be launched as "the testing factory": a
+concept with no **boundary term** has nothing for another repo to reconcile
+against. Agreed 2026-07-31: promote `factory`, `bundle`, and `blueprint` to
+CONTEXT-MAP boundary terms with vision retaining the concept. Until that
+lands, treat this entry as assay's reading, not settled authority.
 
 Authority for cross-repo terms is
 `compass/ecosystem/CONTEXT-MAP.md` (installed copy:

@@ -16,6 +16,14 @@ It is deliberately *not* "write more tests". A test is one kind of comparison, a
 
 **A claim without a paired, re-runnable comparison is folklore.** It may well be true. You cannot tell, and it decays.
 
+## What this is
+
+**A diagnostic instrument.** Install it, point it at a project, and it reports what that project can currently *prove* about itself — and where it cannot.
+
+It is **not a factory** (ADR-0001). A factory is a member-operated production capability — an operator, their agents, their installed stack, turning models into outcomes (`vision/factory-of-factories.md`). This repo is distributed, and produces a report. It is the instrument such a factory would use.
+
+The repo launched as "the testing factory", which was an overclaim on a word that already had a definition. Corrected 2026-07-31; the bar for earning it is explicit — when a second project's verification is cheaper than ours was.
+
 ## Who this is for
 
 Not only us. The intended output is **a practice other people can run against their own systems** — not our test cases. cortex is simply the first system it was proven against, and the corpus here is *evidence the practice works*, not the product.
