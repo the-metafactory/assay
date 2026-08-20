@@ -36,6 +36,7 @@
 // left out rather than justified in.
 
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { arch, platform, release } from "node:os";
 import { findCortexRepo } from "./cortex-repo";
 import type { SubstrateId } from "./substrate";
@@ -76,6 +77,104 @@ export interface EnvironmentStamp {
    * module exists to avoid. `null` when no checkout was found.
    */
   cortex_dirty: boolean | null;
+  /**
+   * The provider-invariant half of the machine's fingerprint digest, as
+   * published by the infrastructure factory that built it — see
+   * ../../../environments/README.md for the contract and
+   * https://github.com/the-metafactory/crucible for the producer.
+   *
+   * This is the field that turns "which machine" from a description into an
+   * identity. `os`/`arch`/`kernel_release` describe a machine the way a
+   * passport describes a face; this is content-addressed, so two runs
+   * either agree or they do not.
+   *
+   * `null` on any machine no factory fingerprinted — a laptop, CI, a box
+   * someone built by hand. That null is the honest answer and is reported
+   * as an unpinned baseline, never defaulted to something that looks like
+   * data.
+   */
+  environment_digest: string | null;
+  /**
+   * The provider-specific half: kernel flavour, image identity, mirror
+   * URIs, cloud-init datasource. Expected to differ between providers for
+   * the same environment definition, which is exactly why it is digested
+   * apart from the core — a difference here is a fact about the provider,
+   * not evidence of drift.
+   *
+   * Recorded so the honest differences are on the record. Compared for
+   * drift like any other field, but a mismatch here reads very differently
+   * from a mismatch in `environment_digest`. `null` when the factory
+   * published no provider half, or when there is no factory.
+   */
+  environment_provider_digest: string | null;
+}
+
+/**
+ * What a factory writes onto a machine it has fingerprinted. The full
+ * field-by-field contract is ../../../environments/README.md; this type is
+ * only the shape assay reads back.
+ */
+interface EnvironmentFile {
+  schema: number;
+  core_digest: string;
+  provider_digest?: string | null;
+  provider?: string | null;
+  definition?: string | null;
+}
+
+/** Where a factory publishes the digest, per the contract. */
+const ENVIRONMENT_FILE_DEFAULT = "/etc/assay/environment.json";
+
+/** The only `schema` value this build knows how to read. */
+const ENVIRONMENT_FILE_SCHEMA = 1;
+
+/**
+ * Reads the factory-published environment file, or returns nulls.
+ *
+ * Every failure path is the same answer — "we don't know" — and none of
+ * them fails the run: no file (the overwhelmingly common case, i.e. every
+ * laptop), unreadable, malformed JSON, a `schema` from the future, a
+ * missing or non-string `core_digest`.
+ *
+ * A future schema is refused rather than best-effort parsed. Reading fields
+ * out of a format this build does not know is how you end up recording a
+ * digest that means something other than what it says, and a wrong identity
+ * is worse than an absent one.
+ */
+function readEnvironmentFile(): {
+  environment_digest: string | null;
+  environment_provider_digest: string | null;
+} {
+  const path = process.env.ASSAY_ENVIRONMENT_FILE ?? ENVIRONMENT_FILE_DEFAULT;
+  const absent = { environment_digest: null, environment_provider_digest: null };
+
+  let raw: string;
+  try {
+    raw = readFileSync(path, "utf8");
+  } catch {
+    return absent;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return absent;
+  }
+
+  if (typeof parsed !== "object" || parsed === null) return absent;
+  const file = parsed as Partial<EnvironmentFile>;
+
+  if (file.schema !== ENVIRONMENT_FILE_SCHEMA) return absent;
+  if (typeof file.core_digest !== "string" || file.core_digest.length === 0) return absent;
+
+  return {
+    environment_digest: file.core_digest,
+    environment_provider_digest:
+      typeof file.provider_digest === "string" && file.provider_digest.length > 0
+        ? file.provider_digest
+        : null,
+  };
 }
 
 function tryGit(cwd: string, args: string[]): string | null {
@@ -100,6 +199,8 @@ export function captureEnvironmentStamp(): EnvironmentStamp {
     cortex_dirty = status === null ? null : status.length > 0;
   }
 
+  const { environment_digest, environment_provider_digest } = readEnvironmentFile();
+
   return {
     captured_at: new Date().toISOString(),
     os: platform(),
@@ -108,6 +209,8 @@ export function captureEnvironmentStamp(): EnvironmentStamp {
     bun_version: typeof Bun !== "undefined" ? Bun.version : null,
     cortex_commit,
     cortex_dirty,
+    environment_digest,
+    environment_provider_digest,
   };
 }
 
@@ -116,7 +219,47 @@ export function formatEnvironmentStamp(s: EnvironmentStamp): string {
   const cortex = s.cortex_commit
     ? `cortex@${s.cortex_commit.slice(0, 12)}${s.cortex_dirty ? "-dirty" : ""}`
     : "cortex@none (no checkout found)";
-  return `${s.os}/${s.arch}  kernel ${s.kernel_release}  bun ${s.bun_version ?? "unknown"}  ${cortex}`;
+  // Says "unfingerprinted" rather than omitting the field. A run on an
+  // unidentified machine should look different from a run that simply did
+  // not print anything.
+  const env = s.environment_digest
+    ? `env@${shortDigest(s.environment_digest)}`
+    : "env@none (unfingerprinted machine)";
+  return `${s.os}/${s.arch}  kernel ${s.kernel_release}  bun ${s.bun_version ?? "unknown"}  ${cortex}  ${env}`;
+}
+
+/**
+ * `sha256:9f2a...` -> `9f2a3b1c8d4e`. Keeps the algorithm prefix out of the
+ * console line while leaving enough hex to be greppable against the full
+ * value in a case file.
+ */
+function shortDigest(d: string): string {
+  const hex = d.includes(":") ? d.slice(d.indexOf(":") + 1) : d;
+  return hex.slice(0, 12);
+}
+
+/**
+ * Collapses "absent" into "explicitly null" for every nullable field of a
+ * case's baseline, so the comparisons below can ask one question instead of
+ * two. A field that is missing from the JSON and a field written as `null`
+ * are the same claim: nobody recorded this.
+ *
+ * `note` is required by the type and left as-is; if a case file is missing it
+ * that is a real defect in the case, not something to paper over here.
+ */
+function normalizeCapturedOn(c: CapturedOnStamp): CapturedOnStamp {
+  return {
+    date: c.date ?? null,
+    os: c.os ?? null,
+    arch: c.arch ?? null,
+    kernel_release: c.kernel_release ?? null,
+    bun_version: c.bun_version ?? null,
+    cortex_commit: c.cortex_commit ?? null,
+    environment_digest: c.environment_digest ?? null,
+    environment_provider_digest: c.environment_provider_digest ?? null,
+    substrate: c.substrate ?? null,
+    note: c.note,
+  };
 }
 
 /**
@@ -144,6 +287,20 @@ export interface CapturedOnStamp {
   kernel_release: string | null;
   bun_version: string | null;
   cortex_commit: string | null;
+  /**
+   * The factory-published environment digest present when this case's
+   * expectation was established (see `EnvironmentStamp.environment_digest`
+   * and ../../../environments/README.md). `null` for every case authored
+   * before an infrastructure factory existed to publish one — which is all
+   * of them at the time this field landed, and the `note` says so.
+   *
+   * A case whose baseline records this is pinned to a machine identity that
+   * can be rebuilt and checked. A case whose baseline does not is the
+   * unpinned baseline this corpus was created to stop producing.
+   */
+  environment_digest: string | null;
+  /** The provider half, when recorded. See `EnvironmentStamp.environment_provider_digest`. */
+  environment_provider_digest: string | null;
   /**
    * The coding harness this case's expectation was established under
    * (see ./substrate.ts). `null` when not recorded — which, honestly, is
@@ -174,20 +331,38 @@ export type DriftAssessment =
  * captured.
  */
 export function assessDrift(
-  captured: CapturedOnStamp,
+  capturedRaw: CapturedOnStamp,
   current: EnvironmentStamp,
   currentSubstrate: SubstrateId | null,
 ): DriftAssessment {
+  // Case files are JSON read off disk, so a field this build knows about can
+  // simply be ABSENT from a file written before it existed — and `undefined`
+  // is not `null`. Reading absence as "recorded" is how you get a comparison
+  // against a value that was never there; the crash it caused when this field
+  // first landed was the lucky version of that bug.
+  //
+  // Absent and explicitly-null mean the same thing here — nobody recorded it —
+  // so they are collapsed once, at the boundary, rather than at each of the
+  // seven comparisons below.
+  const captured = normalizeCapturedOn(capturedRaw);
+
   const comparableCount =
-    (["os", "arch", "kernel_release", "cortex_commit"] as const).filter(
-      (f) => captured[f] !== null,
-    ).length + (captured.substrate !== null ? 1 : 0);
+    (
+      [
+        "os",
+        "arch",
+        "kernel_release",
+        "cortex_commit",
+        "environment_digest",
+        "environment_provider_digest",
+      ] as const
+    ).filter((f) => captured[f] !== null).length + (captured.substrate !== null ? 1 : 0);
 
   if (comparableCount === 0) {
     const dateNote = captured.date ? `the date (${captured.date})` : "nothing";
     return {
       kind: "unknown",
-      reason: `captured_on records ${dateNote} and no environment or substrate identity — this case is locked against an unpinned baseline`,
+      reason: `captured_on records ${dateNote} and no environment or substrate identity (no environment_digest, so no factory-built machine to rebuild and compare against) — this case is locked against an unpinned baseline`,
     };
   }
 
@@ -205,6 +380,32 @@ export function assessDrift(
     const from = captured.cortex_commit.slice(0, 12);
     const to = current.cortex_commit ? current.cortex_commit.slice(0, 12) : "none";
     differences.push(`cortex_commit: ${from} -> ${to}`);
+  }
+  // Reported before substrate and after cortex_commit deliberately: this is
+  // the strongest identity on the record, so when several fields disagree it
+  // should be the one a reader sees first among the machine-level ones.
+  if (
+    captured.environment_digest !== null &&
+    captured.environment_digest !== current.environment_digest
+  ) {
+    const from = shortDigest(captured.environment_digest);
+    const to = current.environment_digest
+      ? shortDigest(current.environment_digest)
+      : "none (this run is on an unfingerprinted machine)";
+    differences.push(`environment_digest: ${from} -> ${to}`);
+  }
+  // A provider-half mismatch on its own is a different statement from a core
+  // mismatch: the same environment definition, built by a different backend.
+  // Labelled so a reader is not left to infer which half moved.
+  if (
+    captured.environment_provider_digest !== null &&
+    captured.environment_provider_digest !== current.environment_provider_digest
+  ) {
+    const from = shortDigest(captured.environment_provider_digest);
+    const to = current.environment_provider_digest
+      ? shortDigest(current.environment_provider_digest)
+      : "none";
+    differences.push(`environment_provider_digest (provider half): ${from} -> ${to}`);
   }
   if (captured.substrate !== null && captured.substrate !== currentSubstrate) {
     differences.push(`substrate: ${captured.substrate} -> ${currentSubstrate ?? "unknown"}`);
