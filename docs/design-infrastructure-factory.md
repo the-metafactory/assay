@@ -1,6 +1,6 @@
 # Design: the infrastructure factory
 
-**Status:** Draft for review — decisions DD-11..DD-18 are proposals, not settled
+**Status:** Draft for review — decisions DD-11..DD-20 are proposals, not settled
 **Author:** Luna (with Andreas)
 **Contributors whose work this specifies:** Vincent Zontini (the factory itself), Robert Chuvala (the digest criterion), Magnús Smárason (the injection protocol)
 **Refs:** [`design-testing-factory.md`](design-testing-factory.md) (DD-1..DD-10, which this continues) · [`../ideas/2026-08-01-environment-tier.md`](../ideas/2026-08-01-environment-tier.md) (the tray note this hardens into a spec) · [`../CONTEXT.md`](../CONTEXT.md) (language — *environment* and *substrate* are used in their canonical senses throughout) · [vpzed/opentofu-pve-template](https://github.com/vpzed/opentofu-pve-template) (the reference implementation)
@@ -204,6 +204,20 @@ a bill. Ephemeral-by-discipline must become ephemeral-by-mechanism before
 the discipline is ever tested. The persistent plane is one small stoppable
 instance (t4g-class) running the same compose files as Vincent's backend.
 
+**Mechanisms, imported from the prior estates rather than invented:**
+
+- **Two independent budgets, not one budget with two notification levels** —
+  a warning budget and a hard-ceiling budget, each firing at 100% of its own
+  limit. Cleaner semantics ("the threshold I declared was crossed") and
+  independently tunable.
+- **The persistent plane gets the estates' auto-shutdown module shape:** a
+  time-based stop schedule as the hard floor, plus an on-host idle monitor
+  (installed via SSM association, re-applied on a schedule to heal drift)
+  that stops the instance early when no sessions exist. The backend plane
+  only needs to be up while tests run or someone is reading Grafana.
+- **The test plane keeps the TTL reaper** — instances there are measured in
+  hours by design, and the reaper terminates rather than stops.
+
 ### DD-14 — Targets install via arc at an exact ref, and every install can fail on drift
 **Decision:** layer 3 (the software under test) is installed by arc:
 
@@ -265,6 +279,112 @@ instance-hour, with no hardware purchase and no waiting on anyone's homelab.
 
 ---
 
+DD-19 and DD-20 import patterns proven in two of this project's operators'
+existing private OpenTofu estates on AWS (referenced here by pattern, not by
+name — they carry client context that does not belong in a public repo).
+None of these is speculative; each has run in production and at least one
+exists because of a failure that already happened once.
+
+### DD-19 — AWS access is SSM-first; nothing in the factory opens port 22
+**Decision:** no security group in either plane allows inbound SSH.
+Interactive access is **SSM Session Manager**; Ansible reaches test-plane
+VMs over **SSH-through-SSM** (`ProxyCommand aws ssm start-session
+--document-name AWS-StartSSHSession`), so every ansible role, `tofu.py`, and
+the fingerprint script run **unchanged** — the transport is tunnelled, the
+tool never knows. Session output/recording lands in S3 as in the prior
+estates. *(Resolves OQ-6.)*
+
+**Why:** this is the established house posture — the prior estates run
+zero-inbound bastions where the SSM session count is the only liveness
+signal — and SSH-over-SSM is the variant that gets that posture without
+forking Vincent's provider-blind layer, which DD-11 forbids. The reference
+implementation keeps plain SSH on the homelab LAN, where the posture
+question is different and is Vincent's.
+
+### DD-20 — Pipeline: OIDC-only auth, plan/apply split, and a delete-guard that reads the saved plan
+**Decision:** four CI mechanisms, imported as a set:
+
+- **GitHub Actions OIDC → AWS; no long-lived keys anywhere.** Trust policy
+  scoped to this one repo, `sub` claim pinned to the protected environment
+  and `main` — never the `pull_request` context.
+- **Plan on PR; apply only by human `workflow_dispatch`** bound to a
+  protected environment with a typed confirmation phrase. The apply consumes
+  the exact saved plan file — never a re-plan that could diverge from what
+  was reviewed.
+- **Delete/replace guard on the persistent plane:** before apply, read the
+  saved plan JSON and **refuse** if any resource's actions include
+  `delete`. An unattended apply that can destroy is the same shape as an
+  exit code accepted as evidence. **Deliberately not applied to the test
+  plane** — there, destruction is the job (DD-15), and the plane is driven
+  by Windmill, not CI; the two planes get separate tofu roots so the guard
+  can bind to one without lying about the other.
+- **Credential-less `tofu validate` + `fmt -check` over every root, with
+  dynamic root discovery** (any directory containing a `.tf`/`.tofu` file is
+  a root). Discovery is dynamic because a hardcoded matrix is a check that
+  silently stops covering — a new root would merge with no CI and read as
+  green, the aggregate-green shape applied to the pipeline itself.
+
+**Why:** each mechanism exists because its absence already burned one of the
+prior estates once (a stale-branch squash-merge silently reverting
+intervening work; uncovered tofu roots merging broken HCL silently). The
+stale-base guard those repos also run is already this repo's CLAUDE.md rule;
+CI should enforce it here too rather than trusting recall.
+
+---
+
+## 5b. Hyperscaler- and hypervisor-agnostic: contract, not abstraction
+
+The tempting road to "agnostic" is an abstraction layer — one module with
+`if provider == "aws"` branches, or a tool that promises to speak every
+cloud. That road is rejected here: HCL has no interfaces, so such modules
+rot into the union of every provider's quirks; and switching languages
+(Pulumi, Crossplane) relocates the problem without shrinking it. An
+abstraction layer is also exactly where a spec field would get **silently
+ignored** on one provider — a healthy trace over an environment that isn't
+what its YAML declared.
+
+Instead, agnosticism lives at **three fixed contracts**, with everything
+below them written natively per provider:
+
+1. **The inventory contract** — the `spec` object, one YAML per VM. A
+   provider module must implement every field **or reject it loudly at plan
+   time**. Silent acceptance of an unimplementable field is a conformance
+   failure, not a convenience: `archive_snapshot` quietly doing nothing on
+   some future provider would unpin apt while the YAML still claims the pin.
+2. **The output contract** — `vm_id`, `ipv4_addresses`, `ssh_command`,
+   `ansible_roles`, `ansible_user` — byte-compatible, because `tofu.py` and
+   every future Windmill Flow consume it blind.
+3. **The result contract** — the fingerprint, split into two sections:
+   a **provider-invariant core** (package set and versions, apt
+   configuration, enabled units, login user, layer-2 file trees) and a
+   **provider section** (kernel flavour, cloud-init datasource, image
+   identity). Core and provider sections are digested separately.
+
+The third contract is what makes agnosticism *measurable* instead of
+asserted: an environment definition is **proven portable** when its
+core-section digest matches across providers, and the provider section is
+where the honest differences live on the record. That is the claim/
+comparison pairing applied to the portability claim itself. *(This
+supersedes OQ-8's divergent-by-design recommendation: the split gives
+within-provider comparability and cross-provider comparability from the
+same capture.)*
+
+**Conformance is executable.** A provider module is conformant when:
+
+- the reference inventory file plans cleanly against it;
+- an inventory file using a spec field the module cannot honor **fails at
+  plan time**, named;
+- `ansible-playbook site.yaml` runs against its VMs with zero edits;
+- its VMs' **core fingerprint digest matches the reference
+  implementation's** for the same definition.
+
+Adding a provider — hypervisor or hyperscaler, Proxmox today, AWS next,
+Hetzner or libvirt or GCP whenever someone needs one — is one module under
+the seam plus a conformance run. Nothing above the seam changes, and the
+conformance run is the proof rather than the promise.
+
+---
+
 ## 6. Phases, acceptance criteria, and predictions
 
 Every criterion below is an executable comparison that can fail. Predictions
@@ -299,9 +419,13 @@ note**, and the rollup still prints the unpinned count loudest.
 - [ ] reaper proven by injection: expired-TTL instance observed terminated
 
 **AC-2:** `tofu apply` with one three-line inventory file yields an
-SSH-reachable instance; `ansible-playbook site.yaml` is green; two rebuilds
-of the same definition produce identical digests; an instance without a
-`ttl_hours` tag fails **at plan time**.
+instance reachable over SSH-through-SSM with **no inbound rules in any
+security group**; `ansible-playbook site.yaml` is green; two rebuilds of
+the same definition produce identical digests; an instance without a
+`ttl_hours` tag fails **at plan time**; the §5b conformance run passes —
+including the negative half: an inventory field the module cannot honor
+fails the plan, named, and the **core** fingerprint digest matches the
+reference implementation's for the same definition.
 
 ### Phase 3 — Target enablement (cortex, myelin)
 - [ ] `metafactory_cortex`, `metafactory_myelin` roles using
@@ -376,23 +500,19 @@ found six times).
 
 ## 9. Open questions
 
-**OQ-6 — SSH or SSM Session Manager as the Ansible transport?** SSH is
-what the reference uses and is dirt simple; SSM removes the open port and
-the key handling at the cost of an agent dependency and connection plugin.
-*Recommendation: start with SSH restricted by security group; revisit when
-the factory outlives a single operator's IP.*
+**OQ-6 — resolved by DD-19.** SSM-first, zero inbound; Ansible over
+SSH-through-SSM so nothing above the seam changes. (Was: SSH restricted by
+security group.)
 
 **OQ-7 — Which account and region?** Needs Andreas and JC. Region trades
 operator latency (ap-southeast-2) against instance-family breadth
 (us-east-1). *Recommendation: decide with the budget alarm, as one
 decision.*
 
-**OQ-8 — Cross-provider digest comparability.** pve and aws digests differ
-by design. Does the fingerprint eventually need a provider-invariant core
-section (packages, layer-2 trees) separate from a provider section (kernel,
-datasource)? *Recommendation: start divergent-by-design; split the
-fingerprint into sections only when a real case needs to compare across
-providers, not before.*
+**OQ-8 — superseded by §5b.** The fingerprint splits into a
+provider-invariant core section and a provider section, digested
+separately: within-provider comparability and cross-provider portability
+proof from the same capture. (Was: divergent-by-design, revisit later.)
 
 **OQ-9 — Where does the factory's final repo live?** Vincent asked twice
 how the deliverable should be structured and nobody answered; his repo is
