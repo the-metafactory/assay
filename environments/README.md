@@ -10,7 +10,7 @@ sentence lives.
 
 Every environment definition in this directory satisfies five properties.
 They come from measured failures, not preference (see
-`docs/design-infrastructure-factory.md`, §2):
+crucible's [design-infrastructure-factory.md](https://github.com/the-metafactory/crucible/blob/main/docs/design-infrastructure-factory.md), §2):
 
 1. **Declared in git.** The definition (or a pinned pointer to the repo that
    holds it) is committed. Nothing about the environment exists only on a
@@ -43,7 +43,7 @@ environments/
 observed to differ is a detector nobody has watched fire. The file records
 the injected fault (e.g. one pinned package version changed), the rebuild,
 and the observed non-empty diff — the same rule the corpus applies to every
-other detector (design-testing-factory.md, DD-3).
+other detector (docs/design-testing-factory.md, DD-3).
 
 ## The honest-null rule applies here too
 
@@ -55,6 +55,7 @@ honest unknown, because it reads as evidence.
 
 Empty by design today, like `gates/` and `scenarios/` before it — the
 contract precedes the contents. The first definitions arrive with the
-infrastructure factory (`docs/design-infrastructure-factory.md`, Phase 1–2).
-The reference implementation of a conforming factory is
+infrastructure factory — **[crucible](https://github.com/the-metafactory/crucible)**,
+whose spec (DD-11..DD-20) implements this contract. The reference
+implementation of a conforming factory is
 [vpzed/opentofu-pve-template](https://github.com/vpzed/opentofu-pve-template).
