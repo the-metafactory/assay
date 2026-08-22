@@ -177,10 +177,11 @@ recorded before the run), **Build** (does declared behaviour match actual,
 and: is this test even capable of failing), **Review** (are all call sites
 covered, was an adversarial pass run), **Release** (does the artifact behave
 as announced, can detectors prove they still fire), **Continuous** (drift
-and decay only visible over time, never at build). None of `gates/`,
-`scenarios/`, or `environments/` has content yet (empty directories,
-Status: Early) — the five stages are the charter's shape, not yet a set of
-executable gate definitions in this repo.
+and decay only visible over time, never at build). `gates/` and
+`scenarios/` have no content yet; `environments/` holds the environment
+contract (`environments/README.md` — the interchange a factory implements)
+but no definitions (Status: Early) — the five stages are the charter's
+shape, not yet a set of executable gate definitions in this repo.
 _Avoid_: conflating this lifecycle-stage sense with a **compass CI gate**
 (e.g. `confidentiality-gate`, `shippable-hygiene`) — those are specific,
 named, automated go/no-go checks that compass's own tooling runs; an assay
@@ -248,7 +249,8 @@ answer.
 **`captured_on`**:
 The field on `CaseRecord` (`CapturedOnStamp`, `lib/environment.ts`) holding
 both halves of a case's attestation — environment fields (`os`, `arch`,
-`kernel_release`, `bun_version`, `cortex_commit`) and `substrate` — as they
+`kernel_release`, `bun_version`, `cortex_commit`, `environment_digest`,
+`environment_provider_digest`) and `substrate` — as they
 stood when the case's check first locked in, plus a `note` that is
 **required whenever any field is null**, explaining what's actually known
 and why the rest isn't reconstructable. Every field is nullable **on

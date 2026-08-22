@@ -178,27 +178,27 @@ async function main(): Promise<void> {
   // BOTH concepts this corpus tracks per case — the machine (environment)
   // and the coding harness (substrate) — under one signal, same as
   // `captured_on` covers both under one record.
-  const unknownBaseline: string[] = [];
+  const unpinnedBaseline: string[] = [];
   const drifted: { id: string; differences: string[] }[] = [];
   let matched = 0;
   for (const c of cases) {
     const assessment = assessDrift(c.captured_on, environment, substrateDetection.substrate);
-    if (assessment.kind === "unknown") unknownBaseline.push(c.id);
+    if (assessment.kind === "unpinned") unpinnedBaseline.push(c.id);
     else if (assessment.kind === "drift") drifted.push({ id: c.id, differences: assessment.differences });
     else matched++;
   }
 
-  if (unknownBaseline.length > 0) {
+  if (unpinnedBaseline.length > 0) {
     console.log(
-      `ENVIRONMENT DRIFT ⚠️  ${unknownBaseline.length} case(s) with an UNPINNED baseline (captured_on never recorded a comparable environment or substrate) — ` +
-        unknownBaseline.join(", "),
+      `ENVIRONMENT DRIFT ⚠️  ${unpinnedBaseline.length} case(s) with an UNPINNED baseline (captured_on never recorded a comparable environment or substrate) — ` +
+        unpinnedBaseline.join(", "),
     );
   }
   if (drifted.length > 0) {
     console.log(`ENVIRONMENT DRIFT ℹ️  ${drifted.length} case(s) captured on a DIFFERENT environment/substrate than this run:`);
     for (const d of drifted) console.log(`                  ${d.id}: ${d.differences.join(", ")}`);
   }
-  if (unknownBaseline.length === 0 && drifted.length === 0) {
+  if (unpinnedBaseline.length === 0 && drifted.length === 0) {
     console.log(`ENVIRONMENT DRIFT none — ${matched}/${cases.length} case(s) match this run's environment/substrate`);
   } else if (matched > 0) {
     console.log(`                  (${matched}/${cases.length} case(s) match this run's environment/substrate)`);

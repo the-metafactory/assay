@@ -31,6 +31,21 @@ reimplementation (assay practice #2). Resolution order:
 No cortex checkout found → every case needing one **skips cleanly**, it does
 not fail. That is the `requires-cortex-checkout` contract, not an error.
 
+### Unit tests for the harness itself
+
+```bash
+bun test
+```
+
+The corpus verifies cortex. This verifies the thing doing the verifying —
+`lib/*.test.ts`, no cortex checkout required, no network. It exists because
+the harness has its own defect history: `lib/environment.ts` has now twice
+shipped a bug in the seam between "recorded", "absent" and "merely present",
+and both times the code read as though it had considered the case. A module
+whose entire job is to refuse to overstate what it knows is exactly the
+module whose refusals need testing, so the tests are mostly refusal paths
+rather than happy paths.
+
 ## Case format — why JSON, not YAML
 
 One JSON file per case (`cases/<id>.json`), validated against the shape in

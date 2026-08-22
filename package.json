@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "eval:execution-boundary": "bun run evals/execution-boundary/runner.ts",
+    "test": "bun test",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
