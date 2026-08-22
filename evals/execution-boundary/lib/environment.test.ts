@@ -511,7 +511,8 @@ describe("assessDrift — drift", () => {
       stamp({ cortex_commit: null }),
       null,
     );
-    if (a.kind === "drift") expect(a.differences[0]).toContain("-> none");
+    if (a.kind !== "drift") throw new Error(`expected drift, got ${a.kind}`);
+    expect(a.differences[0]).toContain("-> none");
   });
 
   test("a digest that moved is reported ahead of substrate", () => {
@@ -529,6 +530,103 @@ describe("assessDrift — drift", () => {
     const a = assessDrift(baseline({ environment_digest: "sha256:aa" }), stamp(), null);
     if (a.kind !== "drift") throw new Error(`expected drift, got ${a.kind}`);
     expect(a.differences[0]).toContain("unfingerprinted machine");
+  });
+
+  // THE ROUND-2 FINDING (F1). The absent case above was covered and the
+  // refused case was not, in both the code and this file — so the drift
+  // renderer kept printing "none (this run is on an unfingerprinted machine)"
+  // for a machine that DOES carry a factory file, months after
+  // `formatEnvironmentStamp` was taught the difference. One run, two
+  // incompatible claims: a header reading `env@unreadable (...)` over per-case
+  // lines asserting the machine has no identity.
+  //
+  // ../../../environments/README.md forbids exactly that assertion — "a
+  // refusal means assay knows nothing about this machine's identity, which is
+  // not at all the same as knowing it has none." Latent while every baseline
+  // in the corpus is null; certain the first time a case is established on a
+  // factory VM, which is the scenario this whole branch exists for.
+  const REFUSED = {
+    environment_file: "refused",
+    environment_file_refusal: "schema 2 — this build reads schema 1",
+  } as const;
+
+  test("a refused file is reported unreadable, never as an absence", () => {
+    const a = assessDrift(baseline({ environment_digest: "sha256:aa" }), stamp(REFUSED), null);
+    if (a.kind !== "drift") throw new Error(`expected drift, got ${a.kind}`);
+    expect(a.differences[0]).toBe(
+      "environment_digest: aa -> unreadable (schema 2 — this build reads schema 1)",
+    );
+    // The negative half is the finding: absence must not be claimed on the
+    // strength of a null that only means "assay did not look".
+    expect(a.differences[0]).not.toContain("unfingerprinted");
+    expect(a.differences[0]).not.toContain("none");
+  });
+
+  test("the provider half gets the same treatment — it is unread for the same reason", () => {
+    const a = assessDrift(
+      baseline({ environment_provider_digest: "sha256:41cd", os: "darwin" }),
+      stamp(REFUSED),
+      null,
+    );
+    if (a.kind !== "drift") throw new Error(`expected drift, got ${a.kind}`);
+    const line = a.differences.find((d) => d.startsWith("environment_provider_digest"));
+    expect(line).toBe(
+      "environment_provider_digest (provider half): 41cd -> unreadable (schema 2 — this build reads schema 1)",
+    );
+  });
+
+  test("the drift line agrees with the environment line about the same run", () => {
+    const s = stamp(REFUSED);
+    const a = assessDrift(baseline({ environment_digest: "sha256:aa" }), s, null);
+    if (a.kind !== "drift") throw new Error(`expected drift, got ${a.kind}`);
+    // Both renderers describe one machine; a reader must never have to pick
+    // which of two lines in the same report to believe.
+    expect(formatEnvironmentStamp(s)).toContain("unreadable");
+    expect(a.differences[0]).toContain("unreadable");
+  });
+
+  test("a refusal with no reason recorded still does not claim an absence", () => {
+    const a = assessDrift(
+      baseline({ environment_digest: "sha256:aa" }),
+      stamp({ environment_file: "refused", environment_file_refusal: null }),
+      null,
+    );
+    if (a.kind !== "drift") throw new Error(`expected drift, got ${a.kind}`);
+    expect(a.differences[0]).toBe("environment_digest: aa -> unreadable (refused)");
+  });
+
+  // The producer guards `.length === 0` on both digests, so this stamp should
+  // be unreachable — but the captured side gets the same hardening
+  // (`normalizeCapturedOn` collapses `""`), and a renderer that would emit
+  // `-> ` for it is one refactor away from being reachable.
+  test("an empty-string digest on this run renders as an absence, not as nothing", () => {
+    const a = assessDrift(
+      baseline({ environment_digest: "sha256:aa" }),
+      stamp({ environment_digest: "" }),
+      null,
+    );
+    if (a.kind !== "drift") throw new Error(`expected drift, got ${a.kind}`);
+    expect(a.differences[0]).toBe(
+      "environment_digest: aa -> none (this run is on an unfingerprinted machine)",
+    );
+  });
+
+  // The third state, guarded so the fix above cannot overshoot into it: the
+  // file was READ and the factory simply published no provider half, which
+  // the contract allows (`provider_digest` is optional). That is a real
+  // absence on the record and "none" is the honest word for it.
+  test("a read file with no provider half is none, not unreadable", () => {
+    const a = assessDrift(
+      baseline({ environment_digest: "sha256:aa", environment_provider_digest: "sha256:41cd" }),
+      stamp({
+        environment_digest: "sha256:aa",
+        environment_provider_digest: null,
+        environment_file: "read",
+      }),
+      null,
+    );
+    if (a.kind !== "drift") throw new Error(`expected drift, got ${a.kind}`);
+    expect(a.differences[0]).toBe("environment_provider_digest (provider half): 41cd -> none");
   });
 
   // The provider half keeps its drift comparison — the same treatment date

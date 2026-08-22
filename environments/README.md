@@ -87,12 +87,41 @@ read no digest either way — but only the second is a claim assay has
 established. A refusal means assay knows nothing about this machine's
 identity, which is not at all the same as knowing it has none.
 
-assay refuses, and says which, for: a `schema` it does not know, a missing or
-non-string `core_digest`, malformed JSON, a path that is not a regular file
-(a FIFO or device is refused without being read — reading one can block
-forever, and nothing on this path may hang a run), a file over 16 KiB, and a
-file it cannot open. A UTF-8 BOM is tolerated rather than refused: that is a
-byte order mark, not a malformed digest.
+**This holds at every place a run renders a digest, not just the header.** The
+per-case drift lines describe the same machine and must reach the same verdict
+about it — see "Why `drift` is defined against the record" below for what they
+print. A report whose header says `env@unreadable` above per-case lines saying
+the machine is unfingerprinted is making two incompatible claims about one
+machine, and leaves a reader to guess which to believe. The rule is one
+machine, one claim, however many lines it takes to say it.
+
+assay refuses, and says which, for every one of:
+
+| Refusal | Reason given |
+|---|---|
+| A `schema` this build does not know | `schema 2 — this build reads schema 1` |
+| No `schema` field at all | `no schema field — this build reads schema 1` |
+| A missing, non-string, or empty `core_digest` | `no usable core_digest` |
+| Malformed JSON | `not valid JSON` |
+| Valid JSON that is not an object — an array, or a bare scalar | `not a JSON object` |
+| A zero-byte file | `empty file` |
+| A path that is not a regular file — a directory, FIFO, or device | `not a regular file` |
+| A file over 16 KiB | `20029 bytes, over the 16384-byte cap` |
+| A file that cannot be opened | `cannot open it (EACCES)` |
+| A file that fails mid-read | `cannot read it (EIO)` |
+
+The list is exhaustive on purpose: a factory author reading this contract
+should be able to predict every refusal assay can produce, and there is no
+"other" row to hide behind. A UTF-8 BOM is tolerated rather than refused —
+that is a byte order mark, not a malformed digest.
+
+Two rows carry more than their wording suggests. **Not a regular file** is
+refused without being read: a FIFO or device can block forever on open or
+read, and nothing on this path may hang a run. **Empty file** and **not a JSON
+object** are separated from `not valid JSON` because they are different facts
+about the factory — a zero-byte file is usually a write that was interrupted
+or never happened, and a JSON array is a file that parsed perfectly and is
+still the wrong shape.
 
 No refusal fails the run. A missing or unreadable environment file is the
 normal condition on every laptop, and the corpus still has results to report;
@@ -139,14 +168,45 @@ established under. `assessDrift` compares the two and the runner reports, per
 case, one of:
 
 - **match** — the case's recorded digest equals this run's.
-- **drift** — both are recorded and they differ. Information, not a verdict:
-  a result captured elsewhere is not automatically wrong, it is
-  automatically *different*, and the difference is now on the record.
+- **drift** — the case recorded an identity and this run does not present the
+  same one. Information, not a verdict: a result captured elsewhere is not
+  automatically wrong, it is automatically *different*, and the difference is
+  now on the record.
 - **unpinned** — the case recorded no digest. Reported loudest, because it
   is the condition this whole apparatus exists to make visible.
 
 These are the words the code uses too: `DriftAssessment.kind` is
 `"match" | "drift" | "unpinned"`. One concept, one name.
+
+**Why `drift` is defined against the record, not the machine.** An earlier
+wording here said drift was "both are recorded and they differ", which left a
+real case unnamed: a case pinned to a digest, run on a machine that offers
+none. That is not `match`, and it is not `unpinned` — the case *is* pinned, it
+is the run that is not — yet "both are recorded" excludes it. The code called
+it `drift` and the contract did not cover it.
+
+The definition is widened rather than a fourth outcome added, because the
+outcome answers one question — *what can this run say about this case's
+baseline?* — and "the run has no identity of its own" is a second, independent
+axis. Splitting it out invites a fifth outcome for a refused file and a sixth
+for the mixed case, and still none of them can express the ordinary situation
+where one case drifts on `os` **and** has an unreadable digest. That
+distinction is per-field, so it lives per-field, in the difference line:
+
+```
+environment_digest: 9f2a3b1c8d4e -> 41cd0000aaaa                                       (moved)
+environment_digest: 9f2a3b1c8d4e -> none (this run is on an unfingerprinted machine)   (absent)
+environment_digest: 9f2a3b1c8d4e -> unreadable (schema 2 — this build reads schema 1)  (refused)
+```
+
+The third line is why the widened definition says *"does not present the same
+one"* rather than *"differs"*. A refused file may well be sitting on a
+correctly fingerprinted machine; assay declined to read it and established
+nothing about that machine either way. Reporting a *difference* would be the
+same overclaim as printing "unfingerprinted machine" for it — the same error
+one level up, in the outcome instead of in the string. What assay actually
+established is narrower, and is exactly what `drift` now claims: the case named
+an identity, and this run cannot show it.
 
 **The provider half never makes a case pinned.** `provider_digest` is
 compared and any change is reported — the honest differences stay on the

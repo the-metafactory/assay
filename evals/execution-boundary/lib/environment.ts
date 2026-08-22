@@ -397,6 +397,55 @@ function shortDigest(d: string): string {
 }
 
 /**
+ * The `-> to` half of a digest difference line: what THIS run has to offer
+ * for a digest the case recorded.
+ *
+ * Exists because `formatEnvironmentStamp` learned the absent/refused
+ * distinction and the drift renderer did not. That left one run printing two
+ * incompatible claims about the same machine — a header reading `env@unreadable
+ * (schema 2 — this build reads schema 1)` above per-case lines reading
+ * `environment_digest: baseline1111 -> none (this run is on an unfingerprinted
+ * machine)`. The second is the exact assertion ../../../environments/README.md
+ * forbids: "a refusal means assay knows nothing about this machine's identity,
+ * which is not at all the same as knowing it has none." A refused file may
+ * well be sitting on a properly fingerprinted machine; assay simply declined
+ * to read it, and has established nothing either way.
+ *
+ * So the same three renderings the header uses, for the same three claims —
+ * derived from `environment_file` rather than from the digest being `null`,
+ * because `null` is where absent and refused are indistinguishable. Both
+ * digest fields share this: neither is read when the file is refused, so
+ * neither may report an absence on the strength of it.
+ *
+ * `absent` is a parameter rather than a constant because the two fields make
+ * different claims when the file genuinely is not there. No file means no
+ * machine identity at all, which is worth spelling out; the provider half is
+ * additionally optional WITHIN a file assay read successfully, so a bare
+ * "none" there covers both "no file" and "a factory that published no
+ * provider half" — and those really are the same fact about the record.
+ *
+ * The digest test is truthiness, not `!== null`, for the same reason
+ * `normalizeCapturedOn` collapses `""` on the captured side: an empty string
+ * is a third spelling of "nothing was recorded", and `shortDigest("")` would
+ * render the nonsense `environment_digest: 9f2a3b1c8d4e -> `. `readEnvironmentFile`
+ * guards `.length === 0` on both digests so no empty string should reach a
+ * stamp — but this module's habit is to harden the render rather than trust
+ * that, and matching `formatEnvironmentStamp`'s truthiness keeps the two
+ * renderers from disagreeing on an edge either might meet first.
+ */
+function renderCurrentDigest(
+  digest: string | null,
+  current: EnvironmentStamp,
+  absent: string,
+): string {
+  if (digest) return shortDigest(digest);
+  if (current.environment_file === "refused") {
+    return `unreadable (${current.environment_file_refusal ?? "refused"})`;
+  }
+  return absent;
+}
+
+/**
  * Collapses "absent" into "explicitly null" for every nullable field of a
  * case's baseline, so the comparisons below can ask one question instead of
  * two. A field that is missing from the JSON and a field written as `null`
@@ -624,9 +673,11 @@ export function assessDrift(
     captured.environment_digest !== current.environment_digest
   ) {
     const from = shortDigest(captured.environment_digest);
-    const to = current.environment_digest
-      ? shortDigest(current.environment_digest)
-      : "none (this run is on an unfingerprinted machine)";
+    const to = renderCurrentDigest(
+      current.environment_digest,
+      current,
+      "none (this run is on an unfingerprinted machine)",
+    );
     differences.push(`environment_digest: ${from} -> ${to}`);
   }
   // A provider-half mismatch on its own is a different statement from a core
@@ -637,9 +688,7 @@ export function assessDrift(
     captured.environment_provider_digest !== current.environment_provider_digest
   ) {
     const from = shortDigest(captured.environment_provider_digest);
-    const to = current.environment_provider_digest
-      ? shortDigest(current.environment_provider_digest)
-      : "none";
+    const to = renderCurrentDigest(current.environment_provider_digest, current, "none");
     differences.push(`environment_provider_digest (provider half): ${from} -> ${to}`);
   }
   if (captured.substrate !== null && captured.substrate !== currentSubstrate) {
