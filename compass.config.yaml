@@ -1,0 +1,49 @@
+# compass.config.yaml — assay's consumer config for compass-core.
+#
+# Deliberately partial. agents-md.yaml in this repo already carries the rule
+# this file follows: "this repo has no arc-manifest.yaml and no package.json
+# version field yet, and no deploy step (it is a corpus/runner repo, not a
+# deployed service). Do not copy the ecosystem-default values here until
+# those are actually true of this repo."
+#
+# So there is no `versioning:` block. Adding one would be the exact failure
+# this corpus catalogues — an artifact asserting more than it can evidence.
+#
+# Schema reference: claude/skills/governance/config-schema.md (compass-core)
+
+schema: compass-config/v1
+
+org:
+  name: the-metafactory
+  display_name: metafactory
+  default_license: MIT
+  default_branch: main
+
+features:
+  # In use in this repo: A-nnn and G-nnn identifiers appear in CONTEXT.md and
+  # CLAUDE.md. Cases are r{round}-f{finding}. No single feature prefix
+  # governs the repo, so compass-core's default stands until one does.
+  id_prefix: F-
+  branch_pattern: "feat/{slug}"
+  commit_prefix: feat
+
+labels:
+  # No standards/labels.yaml here either; the ecosystem defaults are what
+  # label-check.ts enforces, and all seven are present.
+  required:
+    types: [bug, documentation, feature, infrastructure]
+    priorities: [now, next, future]
+
+validators:
+  claude_md:
+    enabled: true
+    # Only the sections this repo's CLAUDE.md actually has. It has no
+    # "Architecture" heading — its structural material lives under "The
+    # shape" and "Layout" — so requiring one would fail a file that is
+    # already correct.
+    required_sections:
+      - Critical Rules
+      - Standard Operating Procedures
+  label_check:
+    enabled: true
+    enforce_required: true
