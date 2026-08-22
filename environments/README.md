@@ -24,17 +24,23 @@ results assay can read.
 
 ## What an environment must be
 
-Five properties. A factory that skips any of them is not producing
-environments, it is producing machines.
+Five properties. They come from measured failures, not preference — crucible's
+[design-infrastructure-factory.md](https://github.com/the-metafactory/crucible/blob/main/docs/design-infrastructure-factory.md)
+§2 records the ones that cost real time to learn. A factory that skips any of
+them is not producing environments, it is producing machines.
 
-1. **Declared in git.** The definition is a file, reviewable and diffable.
-   Not a console click, not a snapshot someone took once.
+1. **Declared in git.** The definition — or a pinned pointer to the repo that
+   holds it, which is what lets the definition live in the factory's repo
+   rather than this one — is a file, reviewable and diffable. Not a console
+   click, not a snapshot someone took once.
 2. **Built to a digest.** The identity is content-addressed. Never a tag,
    never a name, never "latest" — those move, and an identity that can move
    silently is not an identity.
 3. **Never mutated in place.** A change means a new environment with a new
    digest, not the same environment edited.
-4. **Destroyed after use.** Ephemeral by mechanism, not by discipline.
+4. **Destroyed after use.** Ephemeral by mechanism, not by discipline: reset
+   is destroy + re-provision, because a snapshot of a drifted machine is not a
+   known-good (crucible DD-15).
 5. **Identity recorded, and reaching the result.** The digest lands in the
    result's `captured_on`. This last one is what this file specifies.
 
@@ -151,10 +157,13 @@ built a machine, never which machine. A `match` resting on it alone would be
 a claim of sameness resting on the one field defined not to be evidence of
 sameness.
 
-**Absence is recorded, never faked.** A run on a laptop with no
-`/etc/assay/environment.json` yields `null` — plus a note saying why. A null
-that says "nothing was recorded here" is worth more than a field quietly
-defaulting to something that looks like data.
+**Absence is recorded, never faked — the honest-null rule.** A run on a laptop
+with no `/etc/assay/environment.json` yields `null`, plus a note saying why. A
+null that says "nothing was recorded here" is worth more than a field quietly
+defaulting to something that looks like data. This is not a new rule invented
+for a new field; it is what `captured_on` has always done (`CONTEXT.md`,
+"Attestation": *"an honestly-`null` field beats a plausible-looking guess"*),
+applied to environment identity.
 
 ## The trust boundary, stated
 
@@ -170,3 +179,37 @@ window in which the file and the machine can drift apart.
 
 It is written down here so that nobody mistakes a recorded digest for a
 verified one.
+
+## What is not in this directory, and why
+
+Two obligations this contract carries are **not** kept here. Their absence is a
+recorded decision, not an oversight.
+
+**The per-environment layout.** crucible spec §4 step 3 has each definition
+live in `environments/<name>/`, with its `definition/`, its `fingerprint.txt`
+and its `DIGEST` committed at lock time. Those are the factory's files and they
+stay in the factory's repo. assay learns a machine's identity from
+`/etc/assay/environment.json` at run time, per the interchange above; a
+committed copy here would be a second place the same digest is written down,
+and two places drift apart. Property 1's *pinned pointer* is how a definition
+stays declared in git without being declared twice.
+
+**The injection proof.** crucible spec §4 step 5 requires a fingerprint be
+observed changing (alter one pinned package version, rebuild, see a non-empty
+diff and a moved digest) before its digest is trusted — DD-3
+(`docs/design-testing-factory.md`) applied to the factory itself. The rule is
+unchanged and not weakened by living elsewhere: a fingerprint that has never
+been observed to differ is a detector nobody has watched fire. But only the
+side that rebuilds the machine can produce that proof, so it is recorded beside
+the fingerprint script. For the reference implementation that is
+[`evidence/ac-0.md`](https://github.com/vpzed/opentofu-pve-template/blob/main/evidence/ac-0.md).
+Same boundary as the section above: assay reads digests, it does not certify
+them.
+
+## Status
+
+No definitions here yet, by design — like `gates/` and `scenarios/`, the
+contract precedes the contents. The first ones arrive with the infrastructure
+factory: crucible's spec implements this contract in **DD-11..DD-20**, and
+[vpzed/opentofu-pve-template](https://github.com/vpzed/opentofu-pve-template)
+is the reference implementation of a conforming factory.
