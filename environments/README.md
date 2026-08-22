@@ -63,7 +63,34 @@ network call, no shared database, no agent.
 | `definition` | no | Path, in the factory's repo, of the file that declared this environment. Context, not identity. |
 
 `ASSAY_ENVIRONMENT_FILE` overrides the path, for testing and for factories
-that cannot write to `/etc`.
+that cannot write to `/etc`. Set but empty is treated as unset.
+
+### What a refusal looks like
+
+The refusal promised above is a behaviour, not a disposition, so it is
+observable. When a file is present and assay will not read a digest out of
+it, assay writes one line to stderr and the run's environment line reads:
+
+```
+env@unreadable (schema 2 — this build reads schema 1)
+```
+
+rather than the `env@none (unfingerprinted machine)` printed for a machine
+that genuinely has no file. Both record `environment_digest: null` — assay
+read no digest either way — but only the second is a claim assay has
+established. A refusal means assay knows nothing about this machine's
+identity, which is not at all the same as knowing it has none.
+
+assay refuses, and says which, for: a `schema` it does not know, a missing or
+non-string `core_digest`, malformed JSON, a path that is not a regular file
+(a FIFO or device is refused without being read — reading one can block
+forever, and nothing on this path may hang a run), a file over 16 KiB, and a
+file it cannot open. A UTF-8 BOM is tolerated rather than refused: that is a
+byte order mark, not a malformed digest.
+
+No refusal fails the run. A missing or unreadable environment file is the
+normal condition on every laptop, and the corpus still has results to report;
+what it must never do is report them as if the machine were known.
 
 ### Why the digest is split in two
 
@@ -111,6 +138,18 @@ case, one of:
   automatically *different*, and the difference is now on the record.
 - **unpinned** — the case recorded no digest. Reported loudest, because it
   is the condition this whole apparatus exists to make visible.
+
+These are the words the code uses too: `DriftAssessment.kind` is
+`"match" | "drift" | "unpinned"`. One concept, one name.
+
+**The provider half never makes a case pinned.** `provider_digest` is
+compared and any change is reported — the honest differences stay on the
+record — but a baseline holding *only* that half is **unpinned**, not
+**match**. It could not be otherwise: the provider half is expected to differ
+between providers for the identical definition, so it says which backend
+built a machine, never which machine. A `match` resting on it alone would be
+a claim of sameness resting on the one field defined not to be evidence of
+sameness.
 
 **Absence is recorded, never faked.** A run on a laptop with no
 `/etc/assay/environment.json` yields `null` — plus a note saying why. A null
