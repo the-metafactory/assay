@@ -13,7 +13,7 @@ name.**
 assay **consumes** environment identity. It does not produce it. Building
 deterministic environments is the infrastructure factory's job — today that
 is [crucible](https://github.com/the-metafactory/crucible), with
-[vpzed/opentofu-pve-template](https://github.com/vpzed/opentofu-pve-template)
+[vpzed-dev/smithy](https://github.com/vpzed-dev/smithy)
 as the reference implementation.
 
 The contract is written down on the consuming side on purpose. An instrument
@@ -262,7 +262,7 @@ unchanged and not weakened by living elsewhere: a fingerprint that has never
 been observed to differ is a detector nobody has watched fire. But only the
 side that rebuilds the machine can produce that proof, so it is recorded beside
 the fingerprint script. For the reference implementation that is
-[`evidence/ac-0.md`](https://github.com/vpzed/opentofu-pve-template/blob/main/evidence/ac-0.md).
+[`evidence/ac-0.md`](https://github.com/vpzed-dev/smithy/blob/main/evidence/ac-0.md).
 Same boundary as the section above: assay reads digests, it does not certify
 them.
 
@@ -271,5 +271,5 @@ them.
 No definitions here yet, by design — like `gates/` and `scenarios/`, the
 contract precedes the contents. The first ones arrive with the infrastructure
 factory: crucible's spec implements this contract in **DD-11..DD-20**, and
-[vpzed/opentofu-pve-template](https://github.com/vpzed/opentofu-pve-template)
+[vpzed-dev/smithy](https://github.com/vpzed-dev/smithy)
 is the reference implementation of a conforming factory.
