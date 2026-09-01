@@ -87,3 +87,10 @@ is an environment question before it is a code accusation.
 Without the seam those futures are indistinguishable, and "did cortex
 break?" is answered with a shrug. With it, disagreement between two runs
 is **attributable instead of mysterious** — which is the entire instrument.
+
+---
+
+For the meta level — how this seam fits metafactory's
+factory-of-factories claim, and why the receipt above is the point
+where the three factories close into one production line — see
+[vision/factory-of-factories](https://github.com/the-metafactory/vision/blob/main/factory-of-factories.md).
