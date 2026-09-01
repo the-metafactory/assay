@@ -4,6 +4,8 @@ How a security finding becomes a case, how a case runs on a factory VM,
 and what the environment seam buys when things later disagree. The example
 is real: case `r2-f2` of the execution-boundary corpus.
 
+![One finding, end to end](assets/one-finding-end-to-end.jpg)
+
 ## Where the corpus came from
 
 The corpus is twelve findings from Robert Chuvala's (NWS) security review
