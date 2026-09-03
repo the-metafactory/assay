@@ -18,16 +18,16 @@
     }
   ],
   "captured_on": {
-    "date": "2026-07-27",
-    "os": null,
-    "arch": null,
-    "kernel_release": null,
-    "bun_version": null,
-    "cortex_commit": null,
-    "environment_digest": null,
-    "environment_provider_digest": null,
+    "date": "2026-09-03",
+    "os": "linux",
+    "arch": "x64",
+    "kernel_release": "7.0.0-28-generic",
+    "bun_version": "1.3.14",
+    "cortex_commit": "01f43bb9029e9fbcf8dffd6c99201001434e921f",
+    "environment_digest": "sha256:e371373de3df3a9c27f8a21884ccd384e0b4596af7bad725aa3b5b31f88d905d",
+    "environment_provider_digest": "sha256:942565ef5b549af6f578e78bf5a3eaa9ead49220e21443f9a2ea8840abf7dd70",
     "substrate": null,
-    "note": "Backfilled after the fact (assay environment-attestation fix, prompted by Rob Chuvala/NWS: \"what substrate were those captured on? If we didn't record it, we have cases locked against an unpinned baseline.\" — his question named the gap; this corpus originally answered it by capturing environment identity (OS/arch/kernel/bun/cortex-commit) under the wrong name, `SubstrateStamp` — see the ubiquitous-language fix that renamed it to `EnvironmentStamp` (lib/environment.ts) and added a genuine `substrate` field, meaning the coding harness (lib/substrate.ts), using the ecosystem's `HarnessId` vocabulary). This corpus's runner captured no environment stamp before the original fix, so the only thing honestly knowable is the date this case entered the corpus — from the corpus's own commit (2173581, 2026-07-27T11:57:28+12:00), NOT from provenance.date above (that's when the underlying finding was discovered, a different event). OS/arch/kernel/bun-version/cortex-commit were never recorded at capture time and are not reconstructable — do not infer them from the machine running this backfill, or from the cortex commit named in this case's `fix` field (that documents the FIX, not the verification environment). `substrate` (coding harness) is also left `null`: this case was in fact authored during a Claude Code session — commit 2173581 carries a `Co-Authored-By: Claude Opus 5` trailer, and the later environment-attestation commit 94e6598 carries a `Claude-Session: https://claude.ai/code/session_...` trailer, both consistent with Claude Code — but neither is a captured substrate stamp, so this is recollection backed by circumstantial commit evidence, not a record. Left `null` rather than asserted `claude-code`, per this corpus's own no-guessing rule. environment_digest and environment_provider_digest are `null` for a reason that postdates this case entirely: the field was added when the infrastructure factory's environment contract landed (environments/README.md), and no factory-built machine existed when this case was captured. There is nothing recorded and nothing reconstructable — a digest cannot be inferred after the fact from a machine that was never fingerprinted, which is the whole point of it being a digest. This case stays on the unpinned-baseline count until it is re-established on a factory VM."
+    "note": "Re-established 2026-09-03 on the factory-built VM from the infrastructure factory's first AC-3 run (Vincent Zontini, ProxMox provider, 2026-09-03 UTC) — run receipt: https://github.com/vpzed-dev/smithy/blob/main/evidence/ac-3.md, validated check-by-check at https://github.com/the-metafactory/crucible/issues/27#issuecomment-5520900609. Every environment field above is that run's real EnvironmentStamp value as published in the receipt (stamp captured 2026-09-03T01:52:26.980Z); nothing is inferred or reconstructed. This replaces the honest-null backfill note from the original environment-attestation fix — the full account of why rounds 1 and 2 spent their first weeks on the unpinned-baseline count is in this file's git history and README.md ('Environment & substrate attestation'). substrate is null because the run detected no coding-harness signal (the corpus ran directly on the VM, outside any harness; the runner renders this as 'unknown') — recorded as null rather than guessed, per this corpus's no-guessing rule."
   },
   "expected": "A path inside a configured readOnlyDirs entry must deny Write/Edit/NotebookEdit (and Bash write-shaped commands) as a code-level check, while still permitting reads of the same path — read-only must mean read-only, deterministically, not as an instruction the model is asked to obey.",
   "status": "fixed",

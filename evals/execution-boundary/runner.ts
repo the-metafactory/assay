@@ -16,10 +16,18 @@
 // available here (no cortex checkout, or a live claude session).
 //
 // Usage: bun run evals/execution-boundary/runner.ts [--round 1|2] [--id r1-f1,...]
+//        bun run evals/execution-boundary/runner.ts --re-establish --receipt <url>
+//
+// `--re-establish` prints ready-to-paste `captured_on` blocks from THIS
+// run's live environment stamp instead of running checks — see
+// lib/re-establish.ts for what it refuses to print and why, and
+// README.md ("Re-establishing a baseline") for the procedure around it.
+// It never writes a case file.
 
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { assessDrift, captureEnvironmentStamp, formatEnvironmentStamp } from "./lib/environment";
+import { buildReEstablishment } from "./lib/re-establish";
 import { detectSubstrate, formatSubstrate } from "./lib/substrate";
 import type { CaseRecord, CheckFn, CheckOutcome } from "./lib/types";
 
@@ -30,16 +38,22 @@ const CHECKS_DIR = join(HERE, "checks");
 interface Args {
   round: number | null;
   ids: string[] | null;
+  reEstablish: boolean;
+  receipt: string | null;
 }
 
 function parseArgs(argv: string[]): Args {
   let round: number | null = null;
   let ids: string[] | null = null;
+  let reEstablish = false;
+  let receipt: string | null = null;
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--round") round = Number(argv[++i]);
     if (argv[i] === "--id") ids = (argv[++i] ?? "").split(",").filter(Boolean);
+    if (argv[i] === "--re-establish") reEstablish = true;
+    if (argv[i] === "--receipt") receipt = argv[++i] ?? null;
   }
-  return { round, ids };
+  return { round, ids, reEstablish, receipt };
 }
 
 function loadCases(): CaseRecord[] {
@@ -108,6 +122,24 @@ async function main(): Promise<void> {
   let cases = loadCases();
   if (args.round) cases = cases.filter((c) => c.round === args.round);
   if (args.ids) cases = cases.filter((c) => args.ids?.includes(c.id));
+
+  // Print-only re-establishment mode: no checks run, no case file is
+  // touched. Refusals go to stderr and exit 1 so a script cannot mistake
+  // "nothing printable here" for a block.
+  if (args.reEstablish) {
+    const result = buildReEstablishment({
+      stamp: captureEnvironmentStamp(),
+      substrate: detectSubstrate(),
+      receipt: args.receipt,
+      caseIds: cases.map((c) => c.id),
+    });
+    if (!result.ok) {
+      console.error(`assay --re-establish: refusing to print — ${result.reason}`);
+      process.exit(1);
+    }
+    console.log(result.text);
+    return;
+  }
 
   // A result without its environment is not a result (README,
   // "Environments"). Captured once per run — every case in this run was
