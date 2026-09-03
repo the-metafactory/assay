@@ -115,11 +115,13 @@ environment (Claude Code sets this in every subprocess it spawns) and
 returns `claude-code` only when that's present. No other `HarnessId` has a
 confirmed signal here, so anything else reads as `unknown` rather than a
 guess — the same discipline the `os`/`arch`/`kernel_release` backfill below
-uses. Every case in this corpus was in fact captured while running under
-Claude Code (this repo's whole workflow runs through it), but that's
-recollection, not a record: the 12 existing cases record `substrate: null`
-with a note, not `"claude-code"` — see the per-case backfill below for the
-(circumstantial, non-definitive) commit-trailer evidence that note cites.
+uses. The 12 existing cases record `substrate: null`, not `"claude-code"`:
+their re-established baselines were captured by a corpus run executed
+directly on the factory VM, outside any coding harness, so no substrate
+signal was present to detect — recorded as `null` per the same rule, and
+each case's `note` says so. (Their original backfilled notes recorded the
+circumstantial commit-trailer evidence that the cases were *authored* in
+Claude Code sessions; that history lives in git.)
 
 ### Per-case baseline
 
@@ -129,23 +131,32 @@ set once at authoring time, never auto-updated by a later run (a stamp
 that updates itself on every run isn't recording a baseline, it's
 recording "now").
 
-The existing `r1-*`/`r2-*` cases were backfilled honestly rather than
-retroactively: their real capture-time environment was never recorded, so
-only the corpus's own commit date is known and every other field is
-`null`, with a `note` explaining why (do not read a later cortex commit
-named in a case's `fix` field as its verification environment — that
-documents the fix, not what the check ran against). `substrate` is `null`
-on all 12 for the same reason — no stamp was captured at the time — even
-though the note also records the circumstantial evidence (commit trailers)
-that they were, in fact, Claude Code sessions.
+**All 12 cases are pinned** (since 2026-09-03). A pinned baseline is one
+whose `captured_on` records a factory-published `environment_digest` — a
+machine identity that can be rebuilt and checked, not merely described —
+alongside the cortex commit the checks actually ran against. Pinned is a
+claim with teeth: on the factory VM the runner reports every case as
+`match`; on any other machine it reports **drift** for every case, because
+the baselines now *distinguish* machines. That drift on your laptop is the
+system working, not a problem to fix.
+
+It was not always so. The `r1-*`/`r2-*` cases spent their first weeks on
+the **unpinned** count: their real capture-time environment was never
+recorded, so they were backfilled honestly rather than retroactively —
+only the corpus's own commit date known, every other field `null`, with a
+`note` saying so instead of a field silently defaulting to something that
+looks like data. That history (and the no-guessing rule it established) is
+in each case file's git history; the rule still governs every new case and
+every re-establishment. The count moved to zero only when the cases were
+re-established from a real factory run — see the procedure below.
 
 At the end of every run, a **third signal** — `ENVIRONMENT DRIFT`,
 alongside `CORPUS INTEGRITY` and `SECURITY POSTURE` below — reports, per
 case, over BOTH environment and substrate together:
 
-- **unpinned baseline** (`captured_on` has no comparable field recorded, as
-  with every backfilled case above) — loudest, because this is exactly the
-  silent gap the finding named;
+- **unpinned baseline** (`captured_on` has no comparable field recorded —
+  none today; the state every backfilled case was in before re-establishment)
+  — loudest, because this is exactly the silent gap the finding named;
 - **drift** (a recorded field disagrees with this run's readings, e.g. a
   different `cortex_commit`, or a different `substrate`) — informational,
   not a failure: it means this result isn't directly comparable to the one
@@ -156,6 +167,66 @@ Environment/substrate drift is never folded into `CORPUS
 INTEGRITY`/`SECURITY POSTURE` and never fails the run — same reasoning as
 the existing two-signal split: collapsing "not comparable" into pass/fail
 is exactly the aggregate-green failure shape this repo exists to avoid.
+
+### Re-establishing a baseline
+
+`captured_on` is never auto-updated (see `lib/environment.ts`'s
+doc-comment — a stamp that updates itself on every run records "now", not
+a baseline). Moving a baseline is therefore a deliberate, human-committed
+act, and this is the procedure for it.
+
+A case is **re-established** when its check has been run on a
+factory-built VM and its `captured_on` is updated from that run's real
+`EnvironmentStamp` — every field (`os`, `arch`, `kernel_release`,
+`bun_version`, `cortex_commit`, `environment_digest`,
+`environment_provider_digest`, `substrate`), plus a `note` replacing the
+previous one that says **when** it was re-established, **on what** (which
+machine, which provider), and **from which run receipt** — the published,
+independently validated evidence of the factory run the stamp came from.
+A value that was not captured stays `null`, and the note says why; a
+plausible guess is not a record.
+
+**Mechanism — decided (assay#36):** the runner's `--re-establish` helper,
+not manual per-case JSON editing. The reason: the values being moved are
+two 64-hex-char digests and a 40-char commit SHA, and hand-transcribing
+those twelve times is how a baseline ends up pinned to a typo — an
+identity that matches nothing, which is worse than no identity because it
+looks like one. The helper prints ready-to-paste `captured_on` blocks from
+the **live** stamp of the run it is invoked in; it **never writes case
+files** — a human pastes each block, reads the diff, and commits, so the
+honest-null discipline stays intact: the machine removes transcription as
+a failure mode, the human keeps the decision.
+
+```bash
+# on the factory VM, after a corpus run:
+bun run evals/execution-boundary/runner.ts --re-establish --receipt <run-receipt-url>
+```
+
+The helper refuses to print (stderr, exit 1) rather than ever printing a
+block containing a guessed value:
+
+- no `--receipt` — a note must cite the run it is answerable to;
+- no cortex checkout — nothing here ran against cortex's real code, so
+  there is no expectation to re-establish;
+- a dirty cortex checkout (or one whose cleanliness can't be determined) —
+  the SHA alone would not pin the tree the checks read;
+- no factory-published environment file — an unfingerprinted machine can
+  only yield a fresh unpinned baseline wearing a re-establishment note;
+- an environment file that was refused — distinct from absent, as
+  everywhere else in `lib/environment.ts`: assay established nothing about
+  the machine, which is not the same as establishing it has no identity.
+
+Each refusal has an observed-red test in `lib/re-establish.test.ts` — the
+guard is trusted because it has been seen firing, not because it reads
+plausibly.
+
+One honest asterisk on the first batch: the 2026-09-03 re-establishment of
+all 12 cases predates the helper by one change (they landed together), so
+those blocks were transcribed from the factory run's stamp **as published
+in its run receipt** (smithy `evidence/ac-3.md`, validated check-by-check
+on crucible#27) rather than printed by the helper on the VM — which is why
+every one of those notes cites that receipt. Future re-establishments use
+the helper on the machine itself.
 
 ## Check contract
 
