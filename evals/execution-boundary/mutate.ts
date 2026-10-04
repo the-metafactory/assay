@@ -59,7 +59,9 @@ const ENTRIES: Entry[] = [
   { id: "r1-f6/path-allow-all", check: "r1-f6", replace: [{ hook: PATH_GUARD, fixture: "allow-all" }], defect: "read-only dir is writable (Write granted)", expected: "fail, naming Write=allow", mustName: ["Write=allow"] },
   { id: "r1-f6/path-deny-all", check: "r1-f6", replace: [{ hook: PATH_GUARD, fixture: "deny-all" }], defect: "read-only dir is unreadable (Read denied)", expected: "fail, naming Read=deny", mustName: ["Read=deny"] },
   { id: "r2-f3/bash-deny-all", check: "r2-f3", replace: [{ hook: BASH_GUARD, fixture: "deny-all" }], defect: "bash-guard denies the repro command (looks like a fix, or a broken guard)", expected: "fail, naming got deny", mustName: ["got deny"] },
-  { id: "r2-f3/bash-contradictory", check: "r2-f3", replace: [{ hook: BASH_GUARD, fixture: "contradictory" }], defect: "bash-guard emits deny then allow and exits 1 (no trustworthy verdict)", expected: "not a clean pass (fail or unknown)", mustName: [] },
+  // Names "got unknown": once #15 makes a contradictory guard read as unknown, only that
+  // failure counts as CAUGHT. If #15's fix words the verdict differently, update this.
+  { id: "r2-f3/bash-contradictory", check: "r2-f3", replace: [{ hook: BASH_GUARD, fixture: "contradictory" }], defect: "bash-guard emits deny then allow and exits 1 (no trustworthy verdict)", expected: "not a clean pass (fail, naming got unknown)", mustName: ["got unknown"] },
 ];
 
 const FIXTURE_EXPECT: Record<Exclude<Fixture, "contradictory">, { decision: string; exit: number }> = {

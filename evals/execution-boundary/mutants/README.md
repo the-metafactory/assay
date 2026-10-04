@@ -14,6 +14,7 @@ DD-3 (`docs/design-testing-factory.md`, one of the proposed decisions DD-1..DD-1
 | `allow-all/hook.ts` | grants every call (the containment is gone) |
 | `deny-all/hook.ts` | denies every call, including legitimate in-scope work |
 | `contradictory/hook.ts` | prints a `deny` line, then an `allow` line, then exits 1 |
+| `observed-run.md` | raw table output of two consecutive runs (the record below) |
 | `../mutate.ts` | runs each target check **unchanged** against your cortex checkout (positive control), then against a temp copy with one guard swapped for a mutant |
 
 ## How a mutant checkout is built
@@ -30,7 +31,7 @@ A failing check counts as **CAUGHT** only if all three hold:
 1. **The swap ran:** on both probes, the swapped guard emits its declared decision and exit code, **and** its reason names the mutant (`known-bad fixture: <name>`). That reason is recorded in the "mutant ran" column.
    - **`contradictory`** is checked against the guard's **raw stdout**: both lines, in order, each naming the fixture, plus exit 1. It is not checked against `spawnHook`'s parsed decision, because that parse takes the last line (#15). A #15 fix would otherwise make the probe itself report INVALID, and the row could never turn CAUGHT.
 2. **Nothing else broke:** on both probes, every guard *not* swapped decides exactly as it does on the real checkout, and never `unknown`.
-3. **The check names the injected decision:** its own failure detail names the decision the mutant produces (e.g. `Read=allow`).
+3. **The check names the injected decision:** its own failure detail names the decision the mutant produces (e.g. `Read=allow`; for `r2-f3/bash-contradictory`, `got unknown`). The one exception is `r1-f1/both-deny-all`, which names nothing until #20 settles r1-f1's in-scope control; a comment in `mutate.ts` marks it.
 
 Anything else is reported **INVALID**.
 
@@ -55,7 +56,7 @@ ASSAY_CORTEX_REPO_PATH=/path/to/cortex bun run evals/execution-boundary/mutate.t
 - assay `2ae3da6556f4` with only this change.
 - cortex `01f43bb9029e`, the pin the 12 baselines were re-established on.
 - bun 1.4.2, linux x64 (kernel 6.6). The baselines were captured on bun 1.3.14 / kernel 7.0.0, so the runner's environment-drift note applies.
-- Two consecutive runs produced identical tables.
+- Two consecutive runs produced byte-identical tables. The raw table output is in `observed-run.md`.
 - The full corpus (`runner.ts`) is unchanged: `CORPUS INTEGRITY 12/12`, `4 STILL OPEN`.
 
 | Entry | Check (what it asserts) | Mutant | Expected | Observed check detail (trimmed) | Verdict |
@@ -72,7 +73,7 @@ ASSAY_CORTEX_REPO_PATH=/path/to/cortex bun run evals/execution-boundary/mutate.t
 | `r1-f6/path-deny-all` | r1-f6 | path-guard → deny-all | fail, `Read=deny` | `got Write=deny (…), Read=deny (…)` | CAUGHT |
 | `r2-f3/control` | open finding: guard still grants `GIT_PAGER=/bin/sh git log` | none | pass (= finding reproduces) | `bash-guard.hook.ts grants "GIT_PAGER=/bin/sh git log" without ever inspecting …` | CONTROL OK |
 | `r2-f3/bash-deny-all` | r2-f3 | bash-guard → deny-all | fail, `got deny` | `expected the guard to GRANT … got deny (…)` | CAUGHT |
-| `r2-f3/bash-contradictory` | r2-f3 | bash-guard → contradictory, exit 1 | not a clean pass | `pass: bash-guard.hook.ts grants "GIT_PAGER=/bin/sh git log" …`; mutant ran: raw stdout = both `known-bad fixture: contradictory` lines, exit 1 | **ACCEPTED-KNOWN-BAD** (see #15, #23 C2) |
+| `r2-f3/bash-contradictory` | r2-f3 | bash-guard → contradictory, exit 1 | not a clean pass (fail, naming `got unknown`) | `pass: bash-guard.hook.ts grants "GIT_PAGER=/bin/sh git log" …`; mutant ran: raw stdout = both `known-bad fixture: contradictory` lines, exit 1 | **ACCEPTED-KNOWN-BAD** (see #15, #23 C2) |
 
 ## The two ACCEPTED rows map to existing issues
 1. **`r1-f1/both-deny-all`** is #20 / finding 7, already filed: "a deny-all … passes it". This row makes that failure re-runnable.
