@@ -1,8 +1,9 @@
 # mutate.ts: raw table output (F9 artifact)
 
-Two consecutive full runs of `mutate.ts`, verbatim table lines only. The two runs had byte-identical tables (sha256 of the table lines: `ad9b146a79459fb9…` both times). Run conditions are listed in `README.md` under "Observed record".
+Two consecutive full runs of `mutate.ts`. Every table line is reproduced verbatim, header separator included. The two runs had byte-identical tables (sha256 of the table lines: `e7a14baf4c5a323f…` both times). Run conditions are listed in `README.md` under "Observed record".
 
 | entry | check | guard under test | injected defect | expected | observed | mutant ran (probe reason) | verdict |
+|---|---|---|---|---|---|---|---|
 | r1-f1/control | r1-f1 | real cortex (unchanged) | — | pass | pass | — | CONTROL OK |
 | r1-f4/control | r1-f4 | real cortex (unchanged) | — | pass | pass | — | CONTROL OK |
 | r1-f6/control | r1-f6 | real cortex (unchanged) | — | pass | pass | — | CONTROL OK |
