@@ -28,6 +28,7 @@ Each guard is probed twice before the check runs: once with an out-of-scope requ
 
 A failing check counts as **CAUGHT** only if all three hold:
 1. **The swap ran:** on both probes, the swapped guard emits its declared decision and exit code, **and** its reason names the mutant (`known-bad fixture: <name>`). That reason is recorded in the "mutant ran" column.
+   - **`contradictory`** is checked against the guard's **raw stdout**: both lines, in order, each naming the fixture, plus exit 1. It is not checked against `spawnHook`'s parsed decision, because that parse takes the last line (#15). A #15 fix would otherwise make the probe itself report INVALID, and the row could never turn CAUGHT.
 2. **Nothing else broke:** on both probes, every guard *not* swapped decides exactly as it does on the real checkout, and never `unknown`.
 3. **The check names the injected decision:** its own failure detail names the decision the mutant produces (e.g. `Read=allow`).
 
@@ -36,6 +37,7 @@ Anything else is reported **INVALID**.
 This step has failed for real:
 - **Collateral breakage:** a version that replaced path-guard wholesale broke bash-guard (`SyntaxError: Export named 'parsePathGuardConfig' not found`). Those rows were reported INVALID, not CAUGHT.
 - **A swap that never happened:** a "deny-all" mutant that was secretly the real bash-guard was reported INVALID with "mutant ran: NOT CONFIRMED".
+- **A parser fix:** with `spawnHook` patched locally to return `unknown` when stdout carries more than one decision line (a stand-in for a #15 fix), `r2-f3/bash-contradictory` reports **CAUGHT**. Before the raw-stdout probe it reported INVALID.
 
 A check that passes against a mutant is reported **ACCEPTED-KNOWN-BAD**, and is left as found.
 
@@ -70,7 +72,7 @@ ASSAY_CORTEX_REPO_PATH=/path/to/cortex bun run evals/execution-boundary/mutate.t
 | `r1-f6/path-deny-all` | r1-f6 | path-guard → deny-all | fail, `Read=deny` | `got Write=deny (…), Read=deny (…)` | CAUGHT |
 | `r2-f3/control` | open finding: guard still grants `GIT_PAGER=/bin/sh git log` | none | pass (= finding reproduces) | `bash-guard.hook.ts grants "GIT_PAGER=/bin/sh git log" without ever inspecting …` | CONTROL OK |
 | `r2-f3/bash-deny-all` | r2-f3 | bash-guard → deny-all | fail, `got deny` | `expected the guard to GRANT … got deny (…)` | CAUGHT |
-| `r2-f3/bash-contradictory` | r2-f3 | bash-guard → contradictory, exit 1 | not a clean pass | `pass: bash-guard.hook.ts grants "GIT_PAGER=/bin/sh git log" …`; mutant ran: `known-bad fixture: contradictory (2/2)` | **ACCEPTED-KNOWN-BAD** (see #15, #23 C2) |
+| `r2-f3/bash-contradictory` | r2-f3 | bash-guard → contradictory, exit 1 | not a clean pass | `pass: bash-guard.hook.ts grants "GIT_PAGER=/bin/sh git log" …`; mutant ran: raw stdout = both `known-bad fixture: contradictory` lines, exit 1 | **ACCEPTED-KNOWN-BAD** (see #15, #23 C2) |
 
 ## The two ACCEPTED rows map to existing issues
 1. **`r1-f1/both-deny-all`** is #20 / finding 7, already filed: "a deny-all … passes it". This row makes that failure re-runnable.

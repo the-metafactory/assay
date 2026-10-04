@@ -15,7 +15,7 @@
 // A rejection only counts when it is for the injected defect: the check's own
 // detail must name the decision the defect produces (e.g. "Read=allow"), and the
 // fixture is first spawned directly to prove it emits exactly that decision with
-// exit 0 (contradictory: its documented two lines + exit 1). A failure for any
+// exit 0 (contradictory: its two documented lines in raw stdout + exit 1). A failure for any
 // other reason is reported INVALID, not CAUGHT. A check that PASSES against a
 // known-bad guard is reported ACCEPTED-KNOWN-BAD, plainly, and is not "fixed"
 // here: deciding what the check should do is the maintainers' call.
@@ -24,8 +24,7 @@
 //   ASSAY_CORTEX_REPO_PATH=/path/to/cortex bun run evals/execution-boundary/mutate.ts
 //   ... mutate.ts --only r1-f1/both-deny-all,r2-f3/bash-contradictory   (one or more entries)
 // Exit: 0 only if every control behaved as documented and every known-bad entry
-// was CAUGHT. At assay 2ae3da6 it exits 1, on two rows that #20 and #15 already
-// describe — see mutants/README.md for the observed record.
+// was CAUGHT. The observed record (which rows, and why) is in mutants/README.md.
 
 import { cpSync, mkdtempSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -51,6 +50,9 @@ interface Entry {
 const ENTRIES: Entry[] = [
   { id: "r1-f1/path-allow-all", check: "r1-f1", replace: [{ hook: PATH_GUARD, fixture: "allow-all" }], defect: "path-guard grants everything (Read containment removed); bash-guard real", expected: "fail, naming Read=allow", mustName: ["Read=allow"] },
   { id: "r1-f1/bash-allow-all", check: "r1-f1", replace: [{ hook: BASH_GUARD, fixture: "allow-all" }], defect: "bash-guard grants everything (Bash containment removed); path-guard real", expected: "fail, naming Bash cat=allow", mustName: ["Bash cat=allow"] },
+  // mustName is empty while this row is ACCEPTED (#20). Once #20 adds r1-f1's in-scope
+  // control, name the in-scope decision deny-all produces here, so that only that
+  // failure counts as CAUGHT.
   { id: "r1-f1/both-deny-all", check: "r1-f1", replace: [{ hook: PATH_GUARD, fixture: "deny-all" }, { hook: BASH_GUARD, fixture: "deny-all" }], defect: "both guards deny everything, including legitimate in-scope work", expected: "fail (DD-3 corollary: firing on the correct state is a failure)", mustName: [] },
   { id: "r1-f4/bash-allow-all", check: "r1-f4", replace: [{ hook: BASH_GUARD, fixture: "allow-all" }], defect: "guard-off bash-guard grants out-of-scope reads", expected: "fail, naming cat=allow", mustName: ["cat=allow"] },
   { id: "r1-f4/bash-deny-all", check: "r1-f4", replace: [{ hook: BASH_GUARD, fixture: "deny-all" }], defect: "guard-off bash-guard denies in-scope uncataloged commands (G-300 regression)", expected: "fail, naming sort=deny", mustName: ["sort=deny"] },
@@ -60,11 +62,33 @@ const ENTRIES: Entry[] = [
   { id: "r2-f3/bash-contradictory", check: "r2-f3", replace: [{ hook: BASH_GUARD, fixture: "contradictory" }], defect: "bash-guard emits deny then allow and exits 1 (no trustworthy verdict)", expected: "not a clean pass (fail or unknown)", mustName: [] },
 ];
 
-const FIXTURE_EXPECT: Record<Fixture, { decision: string; exit: number }> = {
+const FIXTURE_EXPECT: Record<Exclude<Fixture, "contradictory">, { decision: string; exit: number }> = {
   "allow-all": { decision: "allow", exit: 0 },
   "deny-all": { decision: "deny", exit: 0 },
-  contradictory: { decision: "allow", exit: 1 }, // last line is "allow"; exit 1
 };
+
+// The contradictory fixture is checked against RAW stdout, not spawnHook's parsed
+// decision/reason. That parse takes the last line, which is the #15 defect, so a
+// #15 fix would make a parsed probe report INVALID and the row could never turn
+// CAUGHT. Both lines, in order, each naming the fixture, plus exit 1, prove the
+// mutant ran whatever the parser does.
+const CONTRADICTORY_LINES = [
+  { decision: "deny", reason: "known-bad fixture: contradictory (1/2)" },
+  { decision: "allow", reason: "known-bad fixture: contradictory (2/2)" },
+];
+function contradictoryRan(raw: string): boolean {
+  const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
+  if (lines.length !== CONTRADICTORY_LINES.length) return false;
+  return lines.every((line, i) => {
+    try {
+      const o = (JSON.parse(line) as { hookSpecificOutput?: { permissionDecision?: string; permissionDecisionReason?: string } }).hookSpecificOutput;
+      const want = CONTRADICTORY_LINES[i];
+      return want !== undefined && o?.permissionDecision === want.decision && o?.permissionDecisionReason === want.reason;
+    } catch {
+      return false;
+    }
+  });
+}
 
 async function runCheck(id: string, cortexRoot: string) {
   const prev = process.env.ASSAY_CORTEX_REPO_PATH;
@@ -92,6 +116,17 @@ const COMPOSE: Record<string, "reexport" | "replace"> = {
 
 function mutantRoot(real: string, replace: Entry["replace"]): string {
   const root = mkdtempSync(join(tmpdir(), "assay-mutant-"));
+  try {
+    composeMutant(real, root, replace);
+  } catch (err) {
+    // A failed setup must not leave its half-built copy behind.
+    rmSync(root, { recursive: true, force: true });
+    throw err;
+  }
+  return root;
+}
+
+function composeMutant(real: string, root: string, replace: Entry["replace"]): void {
   // A plain copy (minus .git) in the OS temp dir: the real checkout is never written
   // to, and nothing from cortex is committed here; hooks are swapped in the copy only.
   const gitDir = join(real, ".git");
@@ -110,7 +145,6 @@ function mutantRoot(real: string, replace: Entry["replace"]): string {
       writeFileSync(target, mutant);
     }
   }
-  return root;
 }
 
 const real = findCortexRepo();
@@ -141,12 +175,14 @@ for (const id of [...new Set(SELECTED.map((e) => e.check))]) {
 }
 
 for (const e of SELECTED) {
-  const root = mutantRoot(real, e.replace);
-  const probeDir = mkdtempSync(join(tmpdir(), "assay-mutant-probe-"));
+  let root: string | undefined;
+  let probeDir: string | undefined;
   let sane = true;
   const ran: string[] = [];
   let r: Awaited<ReturnType<typeof runCheck>>;
   try {
+    root = mutantRoot(real, e.replace);
+    probeDir = mkdtempSync(join(tmpdir(), "assay-mutant-probe-"));
     // Sanity, so a check result below can be attributed to the mutant and nothing else.
     // Two probes per guard — out-of-scope AND in-scope — because a deny-all mutant and
     // the real guard agree on the out-of-scope one:
@@ -166,7 +202,11 @@ for (const e of SELECTED) {
       const swapped = e.replace.find((x) => x.hook === hook);
       for (const stdin of probes[hook] ?? []) {
         const s = await spawnHook({ cortexRepo: root, hookRelPath: hook, stdin, env: probeEnv, cwd: inScope });
-        if (swapped) {
+        if (swapped?.fixture === "contradictory") {
+          const named = contradictoryRan(s.raw);
+          if (!named || s.exitCode !== 1) sane = false;
+          if (named) ran.push(`${hook.split("/").pop()}: raw stdout = both "known-bad fixture: contradictory" lines, exit ${s.exitCode}`);
+        } else if (swapped) {
           const want = FIXTURE_EXPECT[swapped.fixture];
           const named = s.reason.includes(`known-bad fixture: ${swapped.fixture}`);
           if (s.decision !== want.decision || s.exitCode !== want.exit || !named) sane = false;
@@ -179,8 +219,8 @@ for (const e of SELECTED) {
     }
     r = await runCheck(e.check, root);
   } finally {
-    rmSync(probeDir, { recursive: true, force: true });
-    rmSync(root, { recursive: true, force: true });
+    if (probeDir) rmSync(probeDir, { recursive: true, force: true });
+    if (root) rmSync(root, { recursive: true, force: true });
   }
   let verdict: string;
   if (!sane) verdict = "INVALID (mutant did not behave as declared, or an untouched guard changed)";
